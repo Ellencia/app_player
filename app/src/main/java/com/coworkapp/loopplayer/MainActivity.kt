@@ -1,11 +1,10 @@
 package com.coworkapp.loopplayer
 
-import android.app.Activity
-import android.content.Intent
-import android.database.Cursor
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
-import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -14,65 +13,109 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.core.content.ContextCompat
+import com.coworkapp.loopplayer.ui.LibraryScreen
 import com.coworkapp.loopplayer.ui.PlayerScreen
 import com.coworkapp.loopplayer.ui.theme.LoopPlayerTheme
 
 class MainActivity : ComponentActivity() {
 
-    private val viewModel: PlayerViewModel by viewModels()
+    private val playerViewModel: PlayerViewModel by viewModels()
+    private val libraryViewModel: LibraryViewModel by viewModels()
 
-    // 파일 선택기 (Storage Access Framework)
-    // mp3, m4a, wav, ogg, flac 등 audio MIME만 보여줌
-    private val openAudioLauncher = registerForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            // URI를 영구 권한으로 잡아놔야 다음 실행 때도 읽을 수 있음
-            try {
-                contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-            } catch (_: SecurityException) { /* 권한 없는 URI는 무시 */ }
-            val name = queryDisplayName(uri) ?: "오디오 파일"
-            viewModel.openTrack(uri, name)
-        }
-    }
+    /** Android 13+ 는 READ_MEDIA_AUDIO, 그 이하는 READ_EXTERNAL_STORAGE */
+    private val mediaPermission: String
+        get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+            Manifest.permission.READ_MEDIA_AUDIO
+        else
+            Manifest.permission.READ_EXTERNAL_STORAGE
 
-    private fun queryDisplayName(uri: Uri): String? {
-        var name: String? = null
-        val cursor: Cursor? = contentResolver.query(uri, null, null, null, null)
-        cursor?.use {
-            val idx = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-            if (idx >= 0 && it.moveToFirst()) name = it.getString(idx)
-        }
-        return name
+    private fun hasMediaPermission(): Boolean =
+        ContextCompat.checkSelfPermission(this, mediaPermission) ==
+            PackageManager.PERMISSION_GRANTED
+
+    private val permissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        libraryViewModel.setPermissionGranted(granted)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 시작 시 권한 상태를 ViewModel 에 반영. 이미 있으면 자동 스캔.
+        libraryViewModel.setPermissionGranted(hasMediaPermission())
+
         setContent {
             LoopPlayerTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    val state by viewModel.uiState.collectAsState()
-                    PlayerScreen(
-                        state = state,
-                        onOpenFile = { openAudioLauncher.launch(arrayOf("audio/*")) },
-                        onTogglePlay = viewModel::togglePlay,
-                        onSeekTo = viewModel::seekTo,
-                        onSeekRelative = viewModel::seekRelative,
-                        onMarkStart = viewModel::markStartHere,
-                        onMarkEnd = viewModel::markEndHere,
-                        onSaveTempSection = viewModel::saveTempAsSection,
-                        onClearTemp = viewModel::clearTempMarkers,
-                        onSelectSection = viewModel::startLoop,
-                        onStopLoop = viewModel::stopLoop,
-                        onRestartActive = viewModel::restartActiveSection,
-                        onSetSpeed = viewModel::setSpeed,
-                        onUpdateSection = viewModel::updateSection,
-                        onDeleteSection = viewModel::deleteSection,
-                    )
+                    var showLibrary by remember { mutableStateOf(false) }
+
+                    if (showLibrary) {
+                        val libState by libraryViewModel.uiState.collectAsState()
+                        LibraryScreen(
+                            state = libState,
+                            onClose = { showLibrary = false },
+                            onRequestPermission = {
+                                if (hasMediaPermission()) {
+                                    libraryViewModel.setPermissionGranted(true)
+                                } else {
+                                    permissionLauncher.launch(mediaPermission)
+                                }
+                            },
+                            onQueryChange = libraryViewModel::setQuery,
+                            onTabChange = libraryViewModel::setTab,
+                            onRefresh = libraryViewModel::refresh,
+                            onPickTrack = { track ->
+                                playerViewModel.openTrack(Uri.parse(track.uri), track.title)
+                                showLibrary = false
+                            },
+                            onToggleRecordingFilter = libraryViewModel::toggleRecordingFilter,
+                            onToggleArtistExpanded = libraryViewModel::toggleArtistExpanded,
+                            onTogglePlaylistExpanded = libraryViewModel::togglePlaylistExpanded,
+                            onOpenCreatePlaylistDialog = {
+                                libraryViewModel.showCreatePlaylistDialog(true)
+                            },
+                            onConfirmCreatePlaylist = libraryViewModel::createPlaylist,
+                            onDismissCreatePlaylistDialog = {
+                                libraryViewModel.showCreatePlaylistDialog(false)
+                            },
+                            onDeletePlaylist = libraryViewModel::deletePlaylist,
+                            onRenamePlaylist = libraryViewModel::renamePlaylist,
+                            onOpenAddToPlaylistDialog = libraryViewModel::openAddToPlaylistDialog,
+                            onAddTrackToPlaylist = libraryViewModel::addTrackToPlaylist,
+                            onRemoveTrackFromPlaylist = libraryViewModel::removeTrackFromPlaylist,
+                            resolvePlaylistTracks = libraryViewModel::resolvePlaylistTracks,
+                        )
+                    } else {
+                        val state by playerViewModel.uiState.collectAsState()
+                        PlayerScreen(
+                            state = state,
+                            onOpenFile = {
+                                // 권한 없으면 미리 요청, 있으면 그냥 라이브러리 열기
+                                if (!hasMediaPermission()) {
+                                    permissionLauncher.launch(mediaPermission)
+                                }
+                                showLibrary = true
+                            },
+                            onTogglePlay = playerViewModel::togglePlay,
+                            onSeekTo = playerViewModel::seekTo,
+                            onSeekRelative = playerViewModel::seekRelative,
+                            onMarkStart = playerViewModel::markStartHere,
+                            onMarkEnd = playerViewModel::markEndHere,
+                            onSaveTempSection = playerViewModel::saveTempAsSection,
+                            onClearTemp = playerViewModel::clearTempMarkers,
+                            onSelectSection = playerViewModel::startLoop,
+                            onStopLoop = playerViewModel::stopLoop,
+                            onRestartActive = playerViewModel::restartActiveSection,
+                            onSetSpeed = playerViewModel::setSpeed,
+                            onUpdateSection = playerViewModel::updateSection,
+                            onDeleteSection = playerViewModel::deleteSection,
+                        )
+                    }
                 }
             }
         }
