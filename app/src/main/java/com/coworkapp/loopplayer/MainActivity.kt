@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.coworkapp.loopplayer.ui.LibraryScreen
+import com.coworkapp.loopplayer.ui.PlayerActions
 import com.coworkapp.loopplayer.ui.PlayerScreen
 import com.coworkapp.loopplayer.ui.theme.LoopPlayerTheme
 
@@ -94,26 +95,29 @@ class MainActivity : ComponentActivity() {
                         val state by playerViewModel.uiState.collectAsState()
                         PlayerScreen(
                             state = state,
-                            onOpenFile = {
-                                // 권한 없으면 미리 요청, 있으면 그냥 라이브러리 열기
-                                if (!hasMediaPermission()) {
-                                    permissionLauncher.launch(mediaPermission)
-                                }
-                                showLibrary = true
-                            },
-                            onTogglePlay = playerViewModel::togglePlay,
-                            onSeekTo = playerViewModel::seekTo,
-                            onSeekRelative = playerViewModel::seekRelative,
-                            onMarkStart = playerViewModel::markStartHere,
-                            onMarkEnd = playerViewModel::markEndHere,
-                            onSaveTempSection = playerViewModel::saveTempAsSection,
-                            onClearTemp = playerViewModel::clearTempMarkers,
-                            onSelectSection = playerViewModel::startLoop,
-                            onStopLoop = playerViewModel::stopLoop,
-                            onRestartActive = playerViewModel::restartActiveSection,
-                            onSetSpeed = playerViewModel::setSpeed,
-                            onUpdateSection = playerViewModel::updateSection,
-                            onDeleteSection = playerViewModel::deleteSection,
+                            actions = PlayerActions(
+                                onOpenFile = {
+                                    // 권한 없으면 미리 요청, 있으면 그냥 라이브러리 열기
+                                    if (!hasMediaPermission()) {
+                                        permissionLauncher.launch(mediaPermission)
+                                    }
+                                    showLibrary = true
+                                },
+                                onTogglePlay = playerViewModel::togglePlay,
+                                onSeekTo = playerViewModel::seekTo,
+                                onSeekRelative = playerViewModel::seekRelative,
+                                onMarkStart = playerViewModel::markStartHere,
+                                onMarkEnd = playerViewModel::markEndHere,
+                                onSaveTempSection = playerViewModel::saveTempAsSection,
+                                onClearTemp = playerViewModel::clearTempMarkers,
+                                onSelectSection = playerViewModel::startLoop,
+                                onStopLoop = playerViewModel::stopLoop,
+                                onRestartActive = playerViewModel::restartActiveSection,
+                                onSetSpeed = playerViewModel::setSpeed,
+                                onUpdateSection = playerViewModel::updateSection,
+                                onDeleteSection = playerViewModel::deleteSection,
+                                onRestoreSection = playerViewModel::restoreSection,
+                            ),
                         )
                     }
                 }

@@ -10,6 +10,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.coworkapp.loopplayer.data.LoopSection
 import com.coworkapp.loopplayer.data.SectionRepository
+import com.coworkapp.loopplayer.data.WaveformAnalyzer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -18,9 +19,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import linc.com.amplituda.Amplituda
-import java.io.File
 
 /**
  * UI 상태
@@ -47,6 +45,7 @@ data class PlayerUiState(
 class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repo = SectionRepository(app)
+    private val waveformAnalyzer = WaveformAnalyzer(app)
 
     /** ExoPlayer 인스턴스 - 액티비티 lifecycle보다 ViewModel이 길어서 여기에 둠 */
     val player: ExoPlayer = ExoPlayer.Builder(app).build().apply {
@@ -73,13 +72,17 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         startPositionPolling()
     }
 
-    /** 50ms마다 현재 재생 위치 갱신 - 구간 반복 판정에도 사용 */
+    /** 재생 중일 때만 50ms마다 위치 갱신. 일시정지/EOS 상태에서는 idle. */
     private fun startPositionPolling() {
         positionJob?.cancel()
         positionJob = viewModelScope.launch {
             while (true) {
-                if (player.isPlaying || player.playbackState == Player.STATE_READY) {
-                    _uiState.update { it.copy(positionMs = player.currentPosition.coerceAtLeast(0L)) }
+                if (player.isPlaying) {
+                    val pos = player.currentPosition.coerceAtLeast(0L)
+                    // 변동이 있을 때만 update (StateFlow가 equal 이면 emit 안 하지만 명시)
+                    if (pos != _uiState.value.positionMs) {
+                        _uiState.update { it.copy(positionMs = pos) }
+                    }
                 }
                 delay(50)
             }
@@ -109,61 +112,15 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             player.prepare()
             player.play()
 
-            // 백그라운드에서 파형 분석 - 1~3초 정도 걸림
+            // 백그라운드에서 파형 분석. 트랙 빠르게 바꾸면 이전 작업 결과는 무시되어야 함
+            // → 현재 trackUri와 결과 도착 시점의 trackUri 비교로 가드
             launch(Dispatchers.IO) {
-                val waveform = analyzeWaveform(uri)
-                _uiState.update { it.copy(waveform = waveform, waveformLoading = false) }
+                val waveform = waveformAnalyzer.analyze(uri)
+                if (_uiState.value.trackUri == uriStr) {
+                    _uiState.update { it.copy(waveform = waveform, waveformLoading = false) }
+                }
             }
         }
-    }
-
-    /**
-     * Amplituda로 파형 추출. content:// URI는 임시 파일로 복사 후 처리.
-     * 결과를 200개 막대로 다운샘플링해서 반환.
-     */
-    private suspend fun analyzeWaveform(uri: Uri): List<Float> = withContext(Dispatchers.IO) {
-        val app = getApplication<Application>()
-        try {
-            val tempFile = File(app.cacheDir, "waveform_input.tmp")
-            app.contentResolver.openInputStream(uri)?.use { input ->
-                tempFile.outputStream().use { output -> input.copyTo(output) }
-            } ?: return@withContext emptyList()
-
-            val amplituda = Amplituda(app)
-            val processed = amplituda.processAudio(tempFile).get()
-            val raw: List<Int> = processed.amplitudesAsList()
-            tempFile.delete()
-            downsampleAmplitudes(raw, targetBars = 200)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            emptyList()
-        }
-    }
-
-    /** raw 진폭 리스트를 targetBars 개로 줄이고 0..1로 정규화 */
-    private fun downsampleAmplitudes(raw: List<Int>, targetBars: Int): List<Float> {
-        if (raw.isEmpty()) return emptyList()
-        val max = (raw.maxOrNull() ?: 1).coerceAtLeast(1).toFloat()
-        if (raw.size <= targetBars) {
-            return raw.map { (it / max).coerceIn(0f, 1f) }
-        }
-        val bucketSize = raw.size.toDouble() / targetBars
-        val result = ArrayList<Float>(targetBars)
-        for (i in 0 until targetBars) {
-            val start = (i * bucketSize).toInt()
-            val end = ((i + 1) * bucketSize).toInt().coerceAtMost(raw.size)
-            if (start >= end) {
-                result.add(0f)
-                continue
-            }
-            // 버킷 내 최대값 (RMS보다 시각적으로 잘 보임)
-            var bucketMax = 0
-            for (j in start until end) {
-                if (raw[j] > bucketMax) bucketMax = raw[j]
-            }
-            result.add((bucketMax / max).coerceIn(0f, 1f))
-        }
-        return result
     }
 
     // ─────────────────────────────  재생 컨트롤  ─────────────────────────────
@@ -173,7 +130,10 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun seekTo(ms: Long) {
-        player.seekTo(ms.coerceIn(0L, _uiState.value.durationMs))
+        val clamped = ms.coerceIn(0L, _uiState.value.durationMs.coerceAtLeast(0L))
+        player.seekTo(clamped)
+        // 일시정지 중이면 polling이 idle이라 UI가 안 따라옴 → 직접 반영
+        _uiState.update { it.copy(positionMs = clamped) }
     }
 
     fun seekRelative(deltaMs: Long) {
@@ -248,6 +208,16 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         persistSections(list)
     }
 
+    /** 스와이프 삭제 후 Undo 흐름용 - 원래 인덱스 자리에 다시 끼워넣기. */
+    fun restoreSection(section: LoopSection, atIndex: Int) {
+        val cur = _uiState.value.sections
+        if (cur.any { it.id == section.id }) return // 이미 있으면 무시
+        val safeIdx = atIndex.coerceIn(0, cur.size)
+        val list = cur.toMutableList().apply { add(safeIdx, section) }
+        _uiState.update { it.copy(sections = list) }
+        persistSections(list)
+    }
+
     private fun persistSections(list: List<LoopSection>) {
         val uri = _uiState.value.trackUri ?: return
         viewModelScope.launch { repo.saveSections(uri, list) }
@@ -262,15 +232,27 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         stopLoop()
         _uiState.update { it.copy(activeSectionId = section.id, currentLoopIndex = 0) }
         setSpeed(section.speed)
-        player.seekTo(section.startMs)
+        seekTo(section.startMs)
         player.play()
         loopJob = viewModelScope.launch {
             var loopIdx = 0
             while (true) {
-                // endMs 도달까지 대기
-                while (player.currentPosition < section.endMs) {
-                    delay(20)
+                // endMs 도달까지 대기. 재생속도 반영해서 남은 실제시간을 계산 후
+                // 큰 덩어리로 sleep하고, 마지막 ~120ms 윈도우에서만 짧게 폴링.
+                while (true) {
                     if (!isStillActive(section.id)) return@launch
+                    val pos = player.currentPosition
+                    if (pos >= section.endMs) break
+
+                    val speed = player.playbackParameters.speed.coerceAtLeast(0.1f)
+                    val remainingPlayMs = ((section.endMs - pos) / speed).toLong()
+                    val sleep = when {
+                        // 일시정지 중이거나 끝점 직전: 짧게 폴링
+                        !player.isPlaying || remainingPlayMs <= 120L -> 30L
+                        // 그 외엔 끝점 ~100ms 전까지 한 번에
+                        else -> (remainingPlayMs - 100L).coerceAtLeast(30L)
+                    }
+                    delay(sleep)
                 }
                 loopIdx += 1
                 _uiState.update { it.copy(currentLoopIndex = loopIdx) }
@@ -289,7 +271,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                     if (!isStillActive(section.id)) return@launch
                     player.play()
                 }
-                player.seekTo(section.startMs)
+                seekTo(section.startMs)
             }
         }
     }

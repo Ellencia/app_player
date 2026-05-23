@@ -32,7 +32,7 @@ fun SectionListPanel(
     onSelect: (LoopSection) -> Unit,
     onStop: () -> Unit,
     onEdit: (LoopSection) -> Unit,
-    onDelete: (String) -> Unit,
+    onDelete: (LoopSection) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
@@ -80,7 +80,7 @@ fun SectionListPanel(
                     currentLoopIndex = currentLoopIndex,
                     onSelect = { onSelect(sec) },
                     onEdit = { onEdit(sec) },
-                    onDelete = { onDelete(sec.id) },
+                    onDelete = { onDelete(sec) },
                 )
             }
         }

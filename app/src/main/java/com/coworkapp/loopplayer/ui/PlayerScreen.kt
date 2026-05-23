@@ -21,6 +21,11 @@ import com.coworkapp.loopplayer.data.LoopSection
 import com.coworkapp.loopplayer.ui.theme.SpeedDisplayStyle
 import com.coworkapp.loopplayer.ui.theme.TimeMainStyle
 import com.coworkapp.loopplayer.ui.theme.TimeSubStyle
+import kotlinx.coroutines.launch
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 
 /**
  * Variant A — Polished Material 3 Purple
@@ -37,27 +42,17 @@ import com.coworkapp.loopplayer.ui.theme.TimeSubStyle
 @Composable
 fun PlayerScreen(
     state: PlayerUiState,
-    onOpenFile: () -> Unit,
-    onTogglePlay: () -> Unit,
-    onSeekTo: (Long) -> Unit,
-    onSeekRelative: (Long) -> Unit,
-    onMarkStart: () -> Unit,
-    onMarkEnd: () -> Unit,
-    onSaveTempSection: (String?) -> Unit,
-    onClearTemp: () -> Unit,
-    onSelectSection: (LoopSection) -> Unit,
-    onStopLoop: () -> Unit,
-    onRestartActive: () -> Unit,
-    onSetSpeed: (Float) -> Unit,
-    onUpdateSection: (LoopSection) -> Unit,
-    onDeleteSection: (String) -> Unit,
+    actions: PlayerActions,
 ) {
     var sectionBeingEdited by remember { mutableStateOf<LoopSection?>(null) }
     var showSaveDialog by remember { mutableStateOf(false) }
     var newSectionLabel by remember { mutableStateOf("") }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val snackbarScope = rememberCoroutineScope()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -69,7 +64,7 @@ fun PlayerScreen(
                     )
                 },
                 actions = {
-                    IconButton(onClick = onOpenFile) {
+                    IconButton(onClick = actions.onOpenFile) {
                         Icon(Icons.Default.FolderOpen, contentDescription = "파일 열기")
                     }
                 },
@@ -88,18 +83,18 @@ fun PlayerScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (state.trackUri == null) {
-                EmptyState(onOpenFile = onOpenFile)
+                EmptyState(onOpenFile = actions.onOpenFile)
                 return@Column
             }
 
             // ── ① 파형 + 시간 + 칩 ──
-            WaveformCard(state, onSeekTo = onSeekTo)
+            WaveformCard(state, onSeekTo = actions.onSeekTo)
 
             // ── ② Transport ──
             TransportRow(
                 isPlaying = state.isPlaying,
-                onSeekRelative = onSeekRelative,
-                onTogglePlay = onTogglePlay,
+                onSeekRelative = actions.onSeekRelative,
+                onTogglePlay = actions.onTogglePlay,
             )
 
             // ── ③ A / B / R ──
@@ -107,8 +102,8 @@ fun PlayerScreen(
                 tempStartMs = state.tempStartMs,
                 tempEndMs   = state.tempEndMs,
                 hasActiveLoop = state.activeSectionId != null,
-                onMarkStart = onMarkStart,
-                onMarkEnd   = onMarkEnd,
+                onMarkStart = actions.onMarkStart,
+                onMarkEnd   = actions.onMarkEnd,
                 onSaveTemp  = {
                     if (state.tempStartMs != null && state.tempEndMs != null) {
                         showSaveDialog = true
@@ -116,22 +111,37 @@ fun PlayerScreen(
                     }
                 },
                 onRestartOrStop = {
-                    if (state.activeSectionId != null) onRestartActive() else onClearTemp()
+                    if (state.activeSectionId != null) actions.onRestartActive()
+                    else actions.onClearTemp()
                 },
             )
 
             // ── ④ 속도 ──
-            SpeedCard(speed = state.speed, onSetSpeed = onSetSpeed)
+            SpeedCard(speed = state.speed, onSetSpeed = actions.onSetSpeed)
 
             // ── ⑤ 저장된 구간 ──
             SectionListPanel(
                 sections = state.sections,
                 activeId = state.activeSectionId,
                 currentLoopIndex = state.currentLoopIndex,
-                onSelect = onSelectSection,
-                onStop = onStopLoop,
+                onSelect = actions.onSelectSection,
+                onStop = actions.onStopLoop,
                 onEdit = { sectionBeingEdited = it },
-                onDelete = onDeleteSection,
+                onDelete = { section ->
+                    // 스와이프 즉시 삭제 → 스낵바로 짧게 실행취소 제공
+                    val idx = state.sections.indexOfFirst { it.id == section.id }
+                    actions.onDeleteSection(section.id)
+                    snackbarScope.launch {
+                        val result = snackbarHostState.showSnackbar(
+                            message = "‘${section.label}’ 삭제됨",
+                            actionLabel = "실행취소",
+                            duration = SnackbarDuration.Short,
+                        )
+                        if (result == SnackbarResult.ActionPerformed) {
+                            actions.onRestoreSection(section, idx.coerceAtLeast(0))
+                        }
+                    }
+                },
             )
 
             Spacer(Modifier.height(40.dp))
@@ -139,6 +149,18 @@ fun PlayerScreen(
     }
 
     if (showSaveDialog) {
+        // 다이얼로그 열릴 때 자동 포커스 + 기본 라벨 전체 선택 → 한 번에 덮어쓰기 가능
+        val focusRequester = remember { FocusRequester() }
+        var fieldValue by remember(showSaveDialog) {
+            mutableStateOf(
+                TextFieldValue(
+                    text = newSectionLabel,
+                    selection = TextRange(0, newSectionLabel.length),
+                )
+            )
+        }
+        LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
         AlertDialog(
             onDismissRequest = { showSaveDialog = false },
             title = { Text("구간 저장") },
@@ -147,16 +169,20 @@ fun PlayerScreen(
                     Text("이름을 정해주세요. (비워두면 자동 번호)")
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
-                        value = newSectionLabel,
-                        onValueChange = { newSectionLabel = it },
+                        value = fieldValue,
+                        onValueChange = {
+                            fieldValue = it
+                            newSectionLabel = it.text
+                        },
                         singleLine = true,
                         label = { Text("구간 이름") },
+                        modifier = Modifier.focusRequester(focusRequester),
                     )
                 }
             },
             confirmButton = {
                 TextButton(onClick = {
-                    onSaveTempSection(newSectionLabel.takeIf { it.isNotBlank() })
+                    actions.onSaveTempSection(newSectionLabel.takeIf { it.isNotBlank() })
                     showSaveDialog = false
                 }) { Text("저장") }
             },
@@ -172,7 +198,7 @@ fun PlayerScreen(
             duration = state.durationMs,
             onDismiss = { sectionBeingEdited = null },
             onSave = {
-                onUpdateSection(it)
+                actions.onUpdateSection(it)
                 sectionBeingEdited = null
             },
         )
@@ -332,34 +358,35 @@ private fun BigShortcutRow(
 ) {
     val canSave = tempStartMs != null && tempEndMs != null
     Row(
-        // 76dp → 53dp (≈ 70%)
-        Modifier.fillMaxWidth().height(53.dp),
+        Modifier.fillMaxWidth().height(56.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         BigButton(
-            label = "A", sub = "시작점",
+            label = "A", sub = "시작",
             color = MaterialTheme.colorScheme.primary,
             active = tempStartMs != null,
             modifier = Modifier.weight(1f),
             onClick = onMarkStart,
         )
         BigButton(
-            label = "B", sub = "끝점",
+            label = "B", sub = "끝",
             color = MaterialTheme.colorScheme.primary,
             active = tempEndMs != null,
             modifier = Modifier.weight(1f),
             onClick = onMarkEnd,
         )
+        // canSave일 때 = "저장" (강조 색), 아니면 "R" (보조 색).
+        // 같은 버튼이지만 색·라벨·아이콘 모두 바뀌어 모드 전환이 명확함.
         BigButton(
             label = if (canSave) "저장" else "R",
             sub = when {
                 canSave -> "구간추가"
                 hasActiveLoop -> "처음으로"
-                else -> "─"
+                else -> "리셋"
             },
             color = if (canSave) MaterialTheme.colorScheme.tertiary
                     else MaterialTheme.colorScheme.secondary,
-            active = false,
+            active = canSave,
             modifier = Modifier.weight(1f),
             onClick = if (canSave) onSaveTemp else onRestartOrStop,
         )
@@ -375,33 +402,30 @@ private fun BigButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
+    // active일 때 약간 더 진한 톤 + outline 으로 강조 (기존 dead-code 글로우 대체)
+    val containerColor = if (active) color else color.copy(alpha = 0.85f)
+    val onColor = MaterialTheme.colorScheme.onPrimary
     Surface(
-        modifier = modifier
-            .clip(RoundedCornerShape(18.dp))
-            // 활성(임시 마커가 잡힌) 상태일 때 배경색과 같은 톤의 더블링 글로우
-            .then(
-                if (active) Modifier.background(
-                    color = MaterialTheme.colorScheme.background,
-                    shape = RoundedCornerShape(18.dp),
-                ) else Modifier
-            ),
-        color = color,
+        modifier = modifier.clip(RoundedCornerShape(18.dp)),
+        color = containerColor,
         onClick = onClick,
+        shadowElevation = if (active) 4.dp else 0.dp,
     ) {
         Column(
             Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            // 22sp × 0.8 = 17.6 → 18sp (영문 label / 한글 sub 모두 동일 비율 축소)
             Text(
-                label, fontSize = 18.sp, fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimary,
+                label,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = onColor,
             )
-            Spacer(Modifier.height(2.dp))
             Text(
-                sub, fontSize = 18.sp,
-                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f),
+                sub,
+                fontSize = 11.sp,
+                color = onColor.copy(alpha = 0.85f),
             )
         }
     }
