@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -42,6 +43,7 @@ import com.coworkapp.loopplayer.data.Playlist
 @Composable
 fun LibraryScreen(
     state: LibraryUiState,
+    canClose: Boolean,
     onClose: () -> Unit,
     onRequestPermission: () -> Unit,
     onQueryChange: (String) -> Unit,
@@ -67,8 +69,12 @@ fun LibraryScreen(
             TopAppBar(
                 title = { Text("라이브러리") },
                 navigationIcon = {
-                    IconButton(onClick = onClose) {
-                        Icon(Icons.Default.Close, contentDescription = "닫기")
+                    // 트랙이 로드돼 있을 때만 플레이어로 돌아갈 수 있음.
+                    // 첫 진입(트랙 없음)에서는 닫을 곳이 없어 아이콘 숨김.
+                    if (canClose) {
+                        IconButton(onClick = onClose) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "플레이어로")
+                        }
                     }
                 },
                 actions = {

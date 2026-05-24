@@ -65,7 +65,7 @@ fun PlayerScreen(
                 },
                 actions = {
                     IconButton(onClick = actions.onOpenFile) {
-                        Icon(Icons.Default.FolderOpen, contentDescription = "파일 열기")
+                        Icon(Icons.Default.LibraryMusic, contentDescription = "라이브러리")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

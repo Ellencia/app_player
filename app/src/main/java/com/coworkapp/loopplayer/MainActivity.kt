@@ -53,13 +53,19 @@ class MainActivity : ComponentActivity() {
         setContent {
             LoopPlayerTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    var showLibrary by remember { mutableStateOf(false) }
+                    val playerState by playerViewModel.uiState.collectAsState()
+                    val hasTrack = playerState.trackUri != null
+
+                    // 라이브러리를 첫 화면으로. 트랙이 없으면 닫을 곳이 없으므로 강제로 라이브러리 유지.
+                    var libraryRequested by remember { mutableStateOf(true) }
+                    val showLibrary = libraryRequested || !hasTrack
 
                     if (showLibrary) {
                         val libState by libraryViewModel.uiState.collectAsState()
                         LibraryScreen(
                             state = libState,
-                            onClose = { showLibrary = false },
+                            canClose = hasTrack,
+                            onClose = { if (hasTrack) libraryRequested = false },
                             onRequestPermission = {
                                 if (hasMediaPermission()) {
                                     libraryViewModel.setPermissionGranted(true)
@@ -72,7 +78,7 @@ class MainActivity : ComponentActivity() {
                             onRefresh = libraryViewModel::refresh,
                             onPickTrack = { track ->
                                 playerViewModel.openTrack(Uri.parse(track.uri), track.title)
-                                showLibrary = false
+                                libraryRequested = false
                             },
                             onToggleRecordingFilter = libraryViewModel::toggleRecordingFilter,
                             onToggleArtistExpanded = libraryViewModel::toggleArtistExpanded,
@@ -92,16 +98,15 @@ class MainActivity : ComponentActivity() {
                             resolvePlaylistTracks = libraryViewModel::resolvePlaylistTracks,
                         )
                     } else {
-                        val state by playerViewModel.uiState.collectAsState()
                         PlayerScreen(
-                            state = state,
+                            state = playerState,
                             actions = PlayerActions(
                                 onOpenFile = {
-                                    // 권한 없으면 미리 요청, 있으면 그냥 라이브러리 열기
+                                    // 권한 없으면 미리 요청, 있으면 라이브러리로 복귀
                                     if (!hasMediaPermission()) {
                                         permissionLauncher.launch(mediaPermission)
                                     }
-                                    showLibrary = true
+                                    libraryRequested = true
                                 },
                                 onTogglePlay = playerViewModel::togglePlay,
                                 onSeekTo = playerViewModel::seekTo,
