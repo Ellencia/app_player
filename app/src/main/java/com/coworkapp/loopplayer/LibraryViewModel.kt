@@ -120,6 +120,8 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
                 totalLoops = 0, // 미추적
                 totalMinutes = (allSongs.sumOf { s -> s.durationMs } / 60_000L).toInt(),
                 activeCount = allSongs.count { s -> s.isActive },
+                recordingCount = allSongs.count { s -> s.isRecording },
+                favoriteCount = allSongs.count { s -> s.favorite },
                 chips = chips,
                 folders = folders,
             )
@@ -131,9 +133,11 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
         val chip = state.selectedChip
         var result = songs
 
-        // 칩 (단일 선택): "모두" / "연습 중" / "★" / 폴더명
+        // 칩 (단일 선택): "모두" / "음악" / "녹음" / "연습 중" / "★" / 폴더명
         result = when (chip) {
             "모두" -> result
+            "음악" -> result.filter { !it.isRecording }
+            "녹음" -> result.filter { it.isRecording }
             "연습 중" -> result.filter { it.isActive }
             "★" -> result.filter { it.favorite }
             else -> result.filter { it.folder == chip } // 폴더명 매칭
@@ -169,12 +173,16 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun buildChips(songs: List<LibrarySong>): List<LibraryChip> {
-        val fixed = listOf(
-            LibraryChip("모두", songs.size),
-            LibraryChip("연습 중", songs.count { it.isActive }, accent = true),
-            LibraryChip("★", songs.count { it.favorite }),
-        )
-        // 상위 5개 폴더를 칩으로 노출
+        val musicCount = songs.count { !it.isRecording }
+        val recCount   = songs.count { it.isRecording }
+        val fixed = buildList {
+            add(LibraryChip("모두", songs.size))
+            if (musicCount > 0) add(LibraryChip("음악", musicCount))
+            if (recCount > 0)   add(LibraryChip("녹음", recCount))
+            add(LibraryChip("연습 중", songs.count { it.isActive }, accent = true))
+            add(LibraryChip("★", songs.count { it.favorite }))
+        }
+        // 상위 5개 폴더를 칩으로 노출 (음악·녹음 카운트로 이미 분류됐으니 폴더는 보조)
         val folders = songs.mapNotNull { it.folder }
             .groupingBy { it }
             .eachCount()
@@ -211,6 +219,7 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
             hueDeg = stableHue(artist),
             favorite = false,                // 저장소 미구현
             isActive = sectionCount > 0,     // 저장 구간이 있는 트랙을 "연습 중" 으로
+            isRecording = isCallRecording || isVoiceRecording,
         )
     }
 

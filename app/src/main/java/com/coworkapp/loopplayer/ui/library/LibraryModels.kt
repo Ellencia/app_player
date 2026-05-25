@@ -26,6 +26,7 @@ data class LibrarySong(
     val hueDeg: Int,
     val favorite: Boolean = false,
     val isActive: Boolean = false,   // 현재 연습 중 (active loop saved or recently practiced)
+    val isRecording: Boolean = false, // 음성/통화 녹음 파일 여부
 )
 
 /** 정렬 기준 — sheet 라디오 리스트와 1:1. */
@@ -82,6 +83,8 @@ data class LibraryUiState(
     val totalLoops:     Int               = 0,    // 누적 반복 (현재 미추적 → 0)
     val totalMinutes:   Int               = 0,
     val activeCount:    Int               = 0,
+    val recordingCount: Int               = 0,
+    val favoriteCount:  Int               = 0,
     val sort:           LibrarySort       = LibrarySort.RecentPractice,
     val sortDescending: Boolean           = true,
     val group:          LibraryGroup      = LibraryGroup.None,

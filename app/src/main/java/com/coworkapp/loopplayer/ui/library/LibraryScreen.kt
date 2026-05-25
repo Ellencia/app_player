@@ -1,14 +1,20 @@
 package com.coworkapp.loopplayer.ui.library
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 
 /**
@@ -26,7 +32,7 @@ import kotlinx.coroutines.launch
  *  - 헤더 우측 검색 탭 → 검색 모드 (별도 처리; 본 컴포저블은 trigger 만)
  *  - 행 롱프레스 → 다중 선택 (콜백만 노출)
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun LibraryScreen(
     state: LibraryUiState,
@@ -65,7 +71,11 @@ fun LibraryScreen(
                     todaySongs   = 0,
                     todayLoops   = 0,
                     counts       = state.toDrawerCounts(),
-                    activeDestination = LibraryDestination.Library,
+                    activeDestination = when (state.selectedChip) {
+                        "녹음" -> LibraryDestination.Recordings
+                        "★"    -> LibraryDestination.Favorites
+                        else   -> LibraryDestination.Library
+                    },
                     onNavigate   = { dest -> scope.launch { drawerState.close() }; onNavigate(dest) },
                     onClose      = { scope.launch { drawerState.close() } },
                 )
@@ -95,13 +105,39 @@ fun LibraryScreen(
                 )
                 SortLine()
                 LazyColumn(Modifier.fillMaxSize()) {
-                    items(state.songs, key = { it.id }) { song ->
-                        SongRow(
-                            song    = song,
-                            options = state.viewOptions,
-                            onClick = { onSongClick(song) },
-                            onLongPress = { onSongLongPress(song) },
-                        )
+                    if (state.group == LibraryGroup.None) {
+                        items(state.songs, key = { it.id }) { song ->
+                            SongRow(
+                                song    = song,
+                                options = state.viewOptions,
+                                onClick = { onSongClick(song) },
+                                onLongPress = { onSongLongPress(song) },
+                            )
+                        }
+                    } else {
+                        // 그룹화: group 키별로 정렬, 각 그룹은 stickyHeader.
+                        // 그룹 내 순서는 ViewModel의 sort 결과 유지.
+                        val grouped = state.songs.groupBy { song ->
+                            when (state.group) {
+                                LibraryGroup.Artist -> song.artist.ifBlank { "—" }
+                                LibraryGroup.Folder -> song.folder ?: "—"
+                                LibraryGroup.Key    -> song.musicKey ?: "—"
+                                LibraryGroup.None   -> ""
+                            }
+                        }.toSortedMap()
+                        grouped.forEach { (groupName, songs) ->
+                            stickyHeader(key = "header::$groupName") {
+                                GroupHeader(label = groupName, count = songs.size)
+                            }
+                            items(songs, key = { it.id }) { song ->
+                                SongRow(
+                                    song    = song,
+                                    options = state.viewOptions,
+                                    onClick = { onSongClick(song) },
+                                    onLongPress = { onSongLongPress(song) },
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -131,6 +167,32 @@ fun LibraryScreen(
     }
 }
 
+@Composable
+private fun GroupHeader(label: String, count: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(LibraryColors.Background)
+            .padding(horizontal = 20.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            label,
+            color = LibraryColors.OnSurface,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = (-0.2).sp,
+        )
+        Text(
+            "$count",
+            color = LibraryColors.OnSurfaceMuted,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 11.sp,
+        )
+    }
+}
+
 /** 드로어 네비게이션 목적지. ViewModel/Activity 가 라우팅 책임. */
 enum class LibraryDestination {
     Library, Recordings, Playlists, Favorites, RecentPractice,
@@ -148,8 +210,8 @@ data class DrawerCounts(
 
 private fun LibraryUiState.toDrawerCounts(): DrawerCounts = DrawerCounts(
     libraryCount = totalCount,
-    recordings   = 0, // 별도 인덱싱 필요 — 현재 0
+    recordings   = recordingCount,
     playlists    = 0,
-    favorites    = songs.count { it.favorite },
+    favorites    = favoriteCount,
     folders      = folders.map { it.name to it.count },
 )

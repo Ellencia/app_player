@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -27,6 +28,7 @@ import androidx.core.content.ContextCompat
 import com.coworkapp.loopplayer.ui.PlayerActions
 import com.coworkapp.loopplayer.ui.PlayerScreen
 import com.coworkapp.loopplayer.ui.library.LibraryColors
+import com.coworkapp.loopplayer.ui.library.LibraryDestination
 import com.coworkapp.loopplayer.ui.library.LibraryScreen
 import com.coworkapp.loopplayer.ui.theme.LoopPlayerTheme
 
@@ -91,10 +93,21 @@ class MainActivity : ComponentActivity() {
                                     libraryRequested = false
                                 },
                                 onSongLongPress = { /* TODO: 다중 선택 */ },
-                                onNavigate = { /* TODO: 드로어 라우팅 */ },
+                                onNavigate = { dest ->
+                                    // 드로어 목적지 → selectedChip으로 매핑.
+                                    // 1:1 매핑되는 항목만 처리하고 나머지(Stats/Settings 등)는 미구현.
+                                    when (dest) {
+                                        LibraryDestination.Library    -> libraryViewModel.selectChip("모두")
+                                        LibraryDestination.Recordings -> libraryViewModel.selectChip("녹음")
+                                        LibraryDestination.Favorites  -> libraryViewModel.selectChip("★")
+                                        else -> { /* TODO */ }
+                                    }
+                                },
                             )
                         }
                     } else {
+                        // 플레이어 화면에서 시스템 뒤로가기 → 라이브러리로 복귀
+                        BackHandler { libraryRequested = true }
                         PlayerScreen(
                             state = playerState,
                             actions = PlayerActions(
