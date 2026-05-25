@@ -48,4 +48,24 @@ class SectionRepository(private val context: Context) {
             )
         }
     }
+
+    /**
+     * 라이브러리 인덱싱용 - 모든 트랙의 (uri → 구간개수) 맵을 한 번에 읽기.
+     * 트랙 수가 많아도 DataStore 1회 read.
+     */
+    suspend fun getAllSectionCounts(): Map<String, Int> {
+        val prefs = context.dataStore.data.first()
+        val result = mutableMapOf<String, Int>()
+        prefs.asMap().forEach { (key, value) ->
+            val name = key.name
+            if (name.startsWith("sections::") && value is String) {
+                val uri = name.removePrefix("sections::")
+                val count = runCatching {
+                    json.decodeFromString<List<LoopSection>>(value).size
+                }.getOrDefault(0)
+                if (count > 0) result[uri] = count
+            }
+        }
+        return result
+    }
 }

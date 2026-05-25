@@ -5,238 +5,220 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.coworkapp.loopplayer.data.LibraryRepository
 import com.coworkapp.loopplayer.data.MusicTrack
-import com.coworkapp.loopplayer.data.Playlist
-import com.coworkapp.loopplayer.data.PlaylistRepository
+import com.coworkapp.loopplayer.data.SectionRepository
+import com.coworkapp.loopplayer.ui.library.LibraryChip
+import com.coworkapp.loopplayer.ui.library.LibraryFolder
+import com.coworkapp.loopplayer.ui.library.LibraryGroup
+import com.coworkapp.loopplayer.ui.library.LibraryQuickFilter
+import com.coworkapp.loopplayer.ui.library.LibrarySong
+import com.coworkapp.loopplayer.ui.library.LibrarySort
+import com.coworkapp.loopplayer.ui.library.LibraryUiState
+import com.coworkapp.loopplayer.ui.library.LibraryViewOptions
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** 라이브러리 메인 탭 */
-enum class LibraryTab { MUSIC, ARTIST, PLAYLIST, RECORDING }
-
-/** 녹음 탭 안 하위 필터 */
-enum class RecordingKind { VOICE, CALL }
-
-/** 아티스트 그룹 1개 — 화면용 파생 모델 */
-data class ArtistGroup(
-    val artist: String,
-    val tracks: List<MusicTrack>,
-)
-
 /**
- * 라이브러리 상태.
+ * Variant E 라이브러리 ViewModel.
+ *
+ * 데이터 소스:
+ *  - LibraryRepository: MediaStore.Audio 인덱싱 → List<MusicTrack>
+ *  - SectionRepository.getAllSectionCounts(): 트랙별 저장된 구간 개수
+ *
+ * 매핑: MusicTrack + sectionCount → LibrarySong
+ *  - lastPracticed / loops / bpm / musicKey 는 우리 앱이 아직 추적하지 않아 null/0
+ *  - hueDeg 는 artist 문자열 해시로 산출 (안정적 색상)
+ *  - isActive = sectionCount > 0 (저장된 구간이 있는 트랙을 "연습 중"으로 간주)
+ *  - favorite = false (별도 저장소 필요, 후속 작업)
+ *
+ * sort/group/filter/selectedChip 변경 시 재정렬·재필터링은 항상 raw tracks 기준으로
+ * 즉시 계산해서 새 state 발행.
  */
-data class LibraryUiState(
-    val loading: Boolean = false,
-    val permissionGranted: Boolean = false,
-    val tracks: List<MusicTrack> = emptyList(),
-    val playlists: List<Playlist> = emptyList(),
-    val query: String = "",
-    val tab: LibraryTab = LibraryTab.MUSIC,
-    /** 녹음 탭에서 켜진 필터들 (둘 다 켜져있으면 음성+통화 모두 표시) */
-    val recordingFilter: Set<RecordingKind> = setOf(RecordingKind.VOICE, RecordingKind.CALL),
-    /** 아티스트 탭에서 펼쳐진 아티스트 이름들 */
-    val expandedArtists: Set<String> = emptySet(),
-    /** 플레이리스트 탭에서 펼쳐진 플레이리스트 id */
-    val expandedPlaylistId: String? = null,
-
-    /** 다이얼로그 상태 */
-    val showCreatePlaylistDialog: Boolean = false,
-    /** 트랙을 플레이리스트에 추가하는 다이얼로그 — 추가할 트랙 (null 이면 닫힘) */
-    val addToPlaylistTrack: MusicTrack? = null,
-) {
-    val musicTracks: List<MusicTrack> get() = tracks.filter {
-        !it.isCallRecording && !it.isVoiceRecording
-    }
-    val voiceTracks: List<MusicTrack> get() = tracks.filter { it.isVoiceRecording }
-    val callTracks: List<MusicTrack> get() = tracks.filter { it.isCallRecording }
-
-    /** 현재 탭의 원본 리스트 (검색 적용 전, ARTIST/PLAYLIST 탭은 무관) */
-    val currentTabTracks: List<MusicTrack>
-        get() = when (tab) {
-            LibraryTab.MUSIC -> musicTracks
-            LibraryTab.RECORDING -> {
-                val out = ArrayList<MusicTrack>()
-                if (RecordingKind.VOICE in recordingFilter) out += voiceTracks
-                if (RecordingKind.CALL  in recordingFilter) out += callTracks
-                // 추가순(최근 우선) 유지
-                out.sortedByDescending { it.dateAddedSec }
-            }
-            else -> emptyList()
-        }
-
-    /** MUSIC / RECORDING 탭용 검색 결과 */
-    val filtered: List<MusicTrack>
-        get() {
-            val base = currentTabTracks
-            val q = query.trim()
-            if (q.isEmpty()) return base
-            return base.filter {
-                it.title.contains(q, ignoreCase = true) ||
-                    it.artist.contains(q, ignoreCase = true) ||
-                    it.folder.contains(q, ignoreCase = true) ||
-                    (it.category?.contains(q, ignoreCase = true) == true)
-            }
-        }
-
-    /** ARTIST 탭용 — 아티스트별 그룹, 검색 적용 */
-    val artistGroups: List<ArtistGroup>
-        get() {
-            val grouped = musicTracks
-                .groupBy { it.artist }
-                .toSortedMap(compareBy { it })
-                .map { (a, ts) -> ArtistGroup(a, ts.sortedBy { it.title }) }
-            val q = query.trim()
-            if (q.isEmpty()) return grouped
-            return grouped.mapNotNull { g ->
-                val filteredTracks = g.tracks.filter {
-                    it.title.contains(q, ignoreCase = true) ||
-                        it.artist.contains(q, ignoreCase = true)
-                }
-                if (filteredTracks.isEmpty() && !g.artist.contains(q, ignoreCase = true)) null
-                else g.copy(tracks = if (g.artist.contains(q, ignoreCase = true)) g.tracks else filteredTracks)
-            }
-        }
-}
-
 class LibraryViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repo = LibraryRepository(app)
-    private val playlistRepo = PlaylistRepository(app)
+    private val sectionRepo = SectionRepository(app)
+
+    /** 원본 트랙 + sectionCount. UI 가공 전 raw 캐시. */
+    private var rawTracks: List<MusicTrack> = emptyList()
+    private var sectionCounts: Map<String, Int> = emptyMap()
 
     private val _uiState = MutableStateFlow(LibraryUiState())
     val uiState: StateFlow<LibraryUiState> = _uiState.asStateFlow()
 
-    init {
-        // 플레이리스트 변경 관찰
-        viewModelScope.launch {
-            playlistRepo.observe().collect { list ->
-                _uiState.update { it.copy(playlists = list) }
-            }
-        }
-    }
-
-    // ─────────────── 권한·인덱싱 ───────────────
     fun setPermissionGranted(granted: Boolean) {
         _uiState.update { it.copy(permissionGranted = granted) }
-        if (granted && _uiState.value.tracks.isEmpty()) {
-            refresh()
-        }
+        if (granted && rawTracks.isEmpty()) refresh()
     }
 
     fun refresh() {
         if (!_uiState.value.permissionGranted) return
         _uiState.update { it.copy(loading = true) }
         viewModelScope.launch {
-            val list = repo.loadAllTracks()
-            _uiState.update { it.copy(tracks = list, loading = false) }
+            rawTracks = repo.loadAllTracks()
+            sectionCounts = sectionRepo.getAllSectionCounts()
+            recompute()
+            _uiState.update { it.copy(loading = false) }
         }
     }
 
-    // ─────────────── UI 상태 토글 ───────────────
-    fun setQuery(q: String) { _uiState.update { it.copy(query = q) } }
-    fun setTab(tab: LibraryTab) {
-        // 탭 바꾸면 검색은 지우지 말고 유지. 펼침 상태는 새 탭에 영향 없음.
-        _uiState.update { it.copy(tab = tab) }
+    // ─────────────── 사용자 액션 ───────────────
+    fun setSort(sort: LibrarySort) {
+        _uiState.update { it.copy(sort = sort) }
+        recompute()
     }
 
-    fun toggleRecordingFilter(kind: RecordingKind) {
+    fun setGroup(group: LibraryGroup) {
+        _uiState.update { it.copy(group = group) }
+        recompute()
+    }
+
+    fun toggleFilter(filter: LibraryQuickFilter) {
         _uiState.update {
-            val next = it.recordingFilter.toMutableSet()
-            if (kind in next) next.remove(kind) else next.add(kind)
-            // 비어버리면 둘 다 켠 상태로 복귀 (UX: 빈 화면 방지)
-            if (next.isEmpty()) {
-                it.copy(recordingFilter = setOf(RecordingKind.VOICE, RecordingKind.CALL))
-            } else {
-                it.copy(recordingFilter = next)
-            }
+            val cur = it.filters
+            it.copy(filters = if (filter in cur) cur - filter else cur + filter)
         }
+        recompute()
     }
 
-    fun toggleArtistExpanded(artist: String) {
-        _uiState.update {
-            val next = it.expandedArtists.toMutableSet()
-            if (artist in next) next.remove(artist) else next.add(artist)
-            it.copy(expandedArtists = next)
-        }
+    fun setViewOptions(opts: LibraryViewOptions) {
+        _uiState.update { it.copy(viewOptions = opts) }
+        // 시각 토글만 바뀌므로 재계산 불필요
     }
 
-    fun togglePlaylistExpanded(playlistId: String) {
+    fun selectChip(chip: String) {
+        _uiState.update { it.copy(selectedChip = chip) }
+        recompute()
+    }
+
+    fun resetSheet() {
         _uiState.update {
             it.copy(
-                expandedPlaylistId = if (it.expandedPlaylistId == playlistId) null else playlistId,
+                sort = LibrarySort.RecentPractice,
+                sortDescending = true,
+                group = LibraryGroup.None,
+                filters = emptySet(),
+                viewOptions = LibraryViewOptions(),
+            )
+        }
+        recompute()
+    }
+
+    // ─────────────── 핵심: 정렬·필터·칩 적용 후 LibrarySong 리스트 생성 ───────────────
+    private fun recompute() {
+        val allSongs = rawTracks.map { it.toLibrarySong(sectionCounts[it.uri] ?: 0) }
+        val chips = buildChips(allSongs)
+        val folders = buildFolders(allSongs)
+        val filtered = applyChipAndFilters(allSongs)
+        val sorted = applySort(filtered)
+        _uiState.update {
+            it.copy(
+                songs = sorted,
+                totalCount = allSongs.size,
+                totalLoops = 0, // 미추적
+                totalMinutes = (allSongs.sumOf { s -> s.durationMs } / 60_000L).toInt(),
+                activeCount = allSongs.count { s -> s.isActive },
+                chips = chips,
+                folders = folders,
             )
         }
     }
 
-    // ─────────────── 플레이리스트 CRUD ───────────────
-    fun showCreatePlaylistDialog(show: Boolean) {
-        _uiState.update { it.copy(showCreatePlaylistDialog = show) }
-    }
+    private fun applyChipAndFilters(songs: List<LibrarySong>): List<LibrarySong> {
+        val state = _uiState.value
+        val chip = state.selectedChip
+        var result = songs
 
-    fun createPlaylist(name: String) {
-        val trimmed = name.trim().ifEmpty {
-            "새 플레이리스트 ${_uiState.value.playlists.size + 1}"
+        // 칩 (단일 선택): "모두" / "연습 중" / "★" / 폴더명
+        result = when (chip) {
+            "모두" -> result
+            "연습 중" -> result.filter { it.isActive }
+            "★" -> result.filter { it.favorite }
+            else -> result.filter { it.folder == chip } // 폴더명 매칭
         }
-        viewModelScope.launch {
-            val current = playlistRepo.getAll()
-            playlistRepo.saveAll(current + Playlist(name = trimmed))
-        }
-        _uiState.update { it.copy(showCreatePlaylistDialog = false) }
-    }
 
-    fun deletePlaylist(id: String) {
-        viewModelScope.launch {
-            val updated = playlistRepo.getAll().filterNot { it.id == id }
-            playlistRepo.saveAll(updated)
-        }
-    }
-
-    fun renamePlaylist(id: String, newName: String) {
-        viewModelScope.launch {
-            val updated = playlistRepo.getAll().map {
-                if (it.id == id) it.copy(name = newName.trim().ifEmpty { it.name })
-                else it
+        // 빠른 필터 (다중 선택)
+        state.filters.forEach { f ->
+            result = when (f) {
+                LibraryQuickFilter.FavoritesOnly -> result.filter { it.favorite }
+                LibraryQuickFilter.PracticingOnly -> result.filter { it.isActive }
+                LibraryQuickFilter.NotPracticed -> result.filter { it.lastPracticed == null }
+                LibraryQuickFilter.ManySections -> result.filter { it.sections > 5 }
             }
-            playlistRepo.saveAll(updated)
         }
+        return result
     }
 
-    /** 트랙을 플레이리스트에 추가 (중복은 제거) */
-    fun addTrackToPlaylist(trackUri: String, playlistId: String) {
-        viewModelScope.launch {
-            val updated = playlistRepo.getAll().map { pl ->
-                if (pl.id == playlistId && trackUri !in pl.trackUris)
-                    pl.copy(trackUris = pl.trackUris + trackUri)
-                else pl
-            }
-            playlistRepo.saveAll(updated)
+    private fun applySort(songs: List<LibrarySong>): List<LibrarySong> {
+        val state = _uiState.value
+        val ordered = when (state.sort) {
+            LibrarySort.RecentPractice -> songs.sortedByDescending { it.lastPracticed ?: 0L }
+            LibrarySort.RecentlyAdded  -> songs // raw tracks 가 이미 date_added DESC 정렬
+            LibrarySort.Title          -> songs.sortedBy { it.title }
+            LibrarySort.Artist         -> songs.sortedBy { it.artist }
+            LibrarySort.MostSections   -> songs.sortedByDescending { it.sections }
+            LibrarySort.MostLoops      -> songs.sortedByDescending { it.loops }
+            LibrarySort.ShortestFirst  -> songs.sortedBy { it.durationMs }
         }
-        _uiState.update { it.copy(addToPlaylistTrack = null) }
+        // pinActiveOnTop 옵션
+        return if (state.viewOptions.pinActiveOnTop) {
+            ordered.sortedByDescending { it.isActive }
+        } else ordered
     }
 
-    fun removeTrackFromPlaylist(trackUri: String, playlistId: String) {
-        viewModelScope.launch {
-            val updated = playlistRepo.getAll().map { pl ->
-                if (pl.id == playlistId)
-                    pl.copy(trackUris = pl.trackUris - trackUri)
-                else pl
-            }
-            playlistRepo.saveAll(updated)
-        }
+    private fun buildChips(songs: List<LibrarySong>): List<LibraryChip> {
+        val fixed = listOf(
+            LibraryChip("모두", songs.size),
+            LibraryChip("연습 중", songs.count { it.isActive }, accent = true),
+            LibraryChip("★", songs.count { it.favorite }),
+        )
+        // 상위 5개 폴더를 칩으로 노출
+        val folders = songs.mapNotNull { it.folder }
+            .groupingBy { it }
+            .eachCount()
+            .entries
+            .sortedByDescending { it.value }
+            .take(5)
+            .map { LibraryChip(it.key, it.value) }
+        return fixed + folders
     }
 
-    /** "이 트랙을 어느 플레이리스트에 추가할까" 다이얼로그 열기 */
-    fun openAddToPlaylistDialog(track: MusicTrack?) {
-        _uiState.update { it.copy(addToPlaylistTrack = track) }
+    private fun buildFolders(songs: List<LibrarySong>): List<LibraryFolder> =
+        songs.mapNotNull { it.folder }
+            .groupingBy { it }
+            .eachCount()
+            .entries
+            .sortedByDescending { it.value }
+            .map { LibraryFolder(it.key, it.value) }
+
+    // ─────────────── MusicTrack → LibrarySong ───────────────
+    private fun MusicTrack.toLibrarySong(sectionCount: Int): LibrarySong {
+        // category 가 있으면 그걸, 없으면 folder 경로의 첫 세그먼트를 폴더명으로.
+        val folderName = category ?: folder.split('/').firstOrNull()?.takeIf { it.isNotBlank() }
+        return LibrarySong(
+            id = uri,
+            title = title,
+            artist = artist,
+            durationMs = durationMs,
+            sections = sectionCount,
+            lastPracticed = null,            // 추적 미구현
+            loops = 0,                       // 추적 미구현
+            bpm = null,                      // 메타 없음
+            musicKey = null,                 // 메타 없음
+            folder = folderName,
+            hueDeg = stableHue(artist),
+            favorite = false,                // 저장소 미구현
+            isActive = sectionCount > 0,     // 저장 구간이 있는 트랙을 "연습 중" 으로
+        )
     }
 
-    /** 플레이리스트 안의 trackUri 들을 실제 트랙 객체로 매핑 (없어진 건 null) */
-    fun resolvePlaylistTracks(playlist: Playlist): List<MusicTrack> {
-        val map = _uiState.value.tracks.associateBy { it.uri }
-        return playlist.trackUris.mapNotNull { map[it] }
+    /** 아티스트 문자열에서 안정적인 hue 산출 (0..359). */
+    private fun stableHue(seed: String): Int {
+        if (seed.isBlank()) return 200
+        var h = 0
+        seed.forEach { h = (h * 31 + it.code) and 0x7FFFFFFF }
+        return h % 360
     }
 }
