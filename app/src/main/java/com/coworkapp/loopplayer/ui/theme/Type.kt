@@ -52,3 +52,43 @@ val SpeedDisplayStyle = TextStyle(
     fontSize   = 18.sp,
     fontWeight = FontWeight.Medium,
 )
+
+// 라이브러리 트랙·구간 등의 리스트 항목 제목 (Material 의 titleMedium=16보다 1sp 작게)
+val ListItemTitleStyle = TextStyle(
+    fontSize = 15.sp,
+    fontWeight = FontWeight.SemiBold,
+)
+
+// 작은 액션 버튼 / 칩 텍스트 (Material 의 bodySmall=12 보다 1sp 큼)
+val ActionLabelStyle = TextStyle(
+    fontSize = 13.sp,
+)
+
+// 속도 프리셋 버튼 (모노 + 13sp)
+val SpeedPresetStyle = TextStyle(
+    fontFamily = MonoFamily,
+    fontSize = 13.sp,
+)
+
+// A/B/R 빅 단축 버튼의 큰 라벨
+val BigButtonLabelStyle = TextStyle(
+    fontSize = 20.sp,
+    fontWeight = FontWeight.Bold,
+)
+
+// A/B/R 빅 단축 버튼의 보조 설명
+val BigButtonSubStyle = TextStyle(
+    fontSize = 11.sp,
+)
+
+// 파형 위 A/B 마커 칩 안 글자
+val WaveformMarkerStyle = TextStyle(
+    fontSize = 9.sp,
+    fontWeight = FontWeight.Bold,
+)
+
+// A/B 마커 칩의 값 (모노 12sp)
+val MarkerChipValueStyle = TextStyle(
+    fontFamily = MonoFamily,
+    fontSize = 12.sp,
+)

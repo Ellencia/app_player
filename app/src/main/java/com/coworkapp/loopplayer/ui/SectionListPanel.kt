@@ -12,8 +12,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.coworkapp.loopplayer.data.LoopSection
+import com.coworkapp.loopplayer.ui.theme.ActionLabelStyle
+import com.coworkapp.loopplayer.ui.theme.ListItemTitleStyle
+import com.coworkapp.loopplayer.ui.theme.LoopDimens
+import com.coworkapp.loopplayer.ui.theme.LoopShapes
 import com.coworkapp.loopplayer.ui.theme.TimeListStyle
 
 /**
@@ -48,9 +51,9 @@ fun SectionListPanel(
             )
             if (activeId != null) {
                 TextButton(onClick = onStop, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)) {
-                    Icon(Icons.Default.Stop, null, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Stop, null, modifier = Modifier.size(LoopDimens.IconSize.Small))
                     Spacer(Modifier.width(4.dp))
-                    Text("반복 중지", fontSize = 13.sp)
+                    Text("반복 중지", style = ActionLabelStyle)
                 }
             }
         }
@@ -58,7 +61,7 @@ fun SectionListPanel(
         if (sections.isEmpty()) {
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
+                shape = LoopShapes.MediumCard,
                 elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp),
                 colors = CardDefaults.elevatedCardColors(
                     containerColor = MaterialTheme.colorScheme.surface,
@@ -124,7 +127,7 @@ private fun SwipeableSectionRow(
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(LoopShapes.MediumCard)
                         .background(MaterialTheme.colorScheme.errorContainer)
                         .padding(horizontal = 20.dp),
                     contentAlignment = Alignment.CenterEnd,
@@ -160,7 +163,7 @@ private fun SectionRow(
              else MaterialTheme.colorScheme.surface
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = LoopShapes.MediumCard,
         colors = CardDefaults.cardColors(containerColor = bg),
         onClick = onSelect,
     ) {
@@ -170,8 +173,8 @@ private fun SectionRow(
         ) {
             // 아이콘 배지
             Surface(
-                modifier = Modifier.size(36.dp),
-                shape = RoundedCornerShape(100.dp),
+                modifier = Modifier.size(LoopDimens.AvatarSize.Small),
+                shape = LoopShapes.Pill,
                 color = if (isActive) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.surfaceVariant,
             ) {
@@ -179,7 +182,7 @@ private fun SectionRow(
                     Icon(
                         if (isActive) Icons.Default.Loop else Icons.Default.PlayArrow,
                         contentDescription = null,
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(LoopDimens.IconSize.Default),
                         tint = if (isActive) MaterialTheme.colorScheme.onPrimary
                                else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -190,8 +193,7 @@ private fun SectionRow(
             Column(Modifier.weight(1f)) {
                 Text(
                     section.label,
-                    fontWeight = FontWeight.SemiBold,
-                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 15.sp),
+                    style = ListItemTitleStyle,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(

@@ -12,16 +12,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.ExperimentalTextApi
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.coworkapp.loopplayer.ui.theme.LoopColors
+import com.coworkapp.loopplayer.ui.theme.WaveformMarkerStyle
 
 /**
  * Variant A 의 진행바 ─ 가운데 기준 미러링된 막대 파형.
@@ -57,8 +54,8 @@ fun WaveformProgressBar(
     val surface  = MaterialTheme.colorScheme.surface
 
     val measurer = rememberTextMeasurer()
-    val labelStyle = remember {
-        TextStyle(color = labelOnTemp, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+    val labelStyle = remember(labelOnTemp) {
+        WaveformMarkerStyle.copy(color = labelOnTemp)
     }
 
     var widthPx by remember { mutableStateOf(1f) }

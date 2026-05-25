@@ -17,12 +17,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.coworkapp.loopplayer.LibraryTab
 import com.coworkapp.loopplayer.LibraryUiState
 import com.coworkapp.loopplayer.RecordingKind
 import com.coworkapp.loopplayer.data.MusicTrack
 import com.coworkapp.loopplayer.data.Playlist
+import com.coworkapp.loopplayer.ui.theme.ListItemTitleStyle
+import com.coworkapp.loopplayer.ui.theme.LoopDimens
+import com.coworkapp.loopplayer.ui.theme.LoopShapes
 
 /**
  * 자체 인덱싱한 음악 라이브러리 화면.
@@ -159,7 +161,7 @@ fun LibraryScreen(
                         }
                     },
                     singleLine = true,
-                    shape = RoundedCornerShape(100.dp),
+                    shape = LoopShapes.Pill,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 )
             }
@@ -312,7 +314,7 @@ private fun ArtistGroupCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = LoopShapes.Card,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         onClick = onToggle,
     ) {
@@ -322,15 +324,15 @@ private fun ArtistGroupCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Surface(
-                    modifier = Modifier.size(40.dp),
-                    shape = RoundedCornerShape(100.dp),
+                    modifier = Modifier.size(LoopDimens.AvatarSize.Default),
+                    shape = LoopShapes.Pill,
                     color = MaterialTheme.colorScheme.primaryContainer,
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             Icons.Default.Person, null,
                             tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(22.dp),
+                            modifier = Modifier.size(LoopDimens.IconSize.Badge),
                         )
                     }
                 }
@@ -338,15 +340,14 @@ private fun ArtistGroupCard(
                 Column(Modifier.weight(1f)) {
                     Text(
                         artistName,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 15.sp,
+                        style = ListItemTitleStyle,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         "$count 곡",
-                        fontSize = 12.sp,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -394,7 +395,7 @@ private fun PlaylistTabBody(
         ) {
             Icon(
                 Icons.Default.QueueMusic, null,
-                modifier = Modifier.size(64.dp),
+                modifier = Modifier.size(LoopDimens.Surface.EmptySmall),
                 tint = MaterialTheme.colorScheme.primary,
             )
             Spacer(Modifier.height(12.dp))
@@ -451,7 +452,7 @@ private fun PlaylistCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = LoopShapes.MediumCard,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         onClick = onToggle,
     ) {
@@ -461,15 +462,15 @@ private fun PlaylistCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Surface(
-                    modifier = Modifier.size(40.dp),
-                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.size(LoopDimens.AvatarSize.Default),
+                    shape = LoopShapes.PlaylistBadge,
                     color = MaterialTheme.colorScheme.tertiaryContainer,
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             Icons.Default.QueueMusic, null,
                             tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                            modifier = Modifier.size(22.dp),
+                            modifier = Modifier.size(LoopDimens.IconSize.Badge),
                         )
                     }
                 }
@@ -477,15 +478,14 @@ private fun PlaylistCard(
                 Column(Modifier.weight(1f)) {
                     Text(
                         playlist.name,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 15.sp,
+                        style = ListItemTitleStyle,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         "${playlist.trackUris.size} 곡",
-                        fontSize = 12.sp,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -588,13 +588,13 @@ private fun RecordingTabBody(
             selected = RecordingKind.VOICE in state.recordingFilter,
             onClick = { onToggleFilter(RecordingKind.VOICE) },
             label = { Text("음성 녹음 · ${state.voiceTracks.size}") },
-            leadingIcon = { Icon(Icons.Default.Mic, null, modifier = Modifier.size(16.dp)) },
+            leadingIcon = { Icon(Icons.Default.Mic, null, modifier = Modifier.size(LoopDimens.IconSize.Small)) },
         )
         FilterChip(
             selected = RecordingKind.CALL in state.recordingFilter,
             onClick = { onToggleFilter(RecordingKind.CALL) },
             label = { Text("통화 녹음 · ${state.callTracks.size}") },
-            leadingIcon = { Icon(Icons.Default.Call, null, modifier = Modifier.size(16.dp)) },
+            leadingIcon = { Icon(Icons.Default.Call, null, modifier = Modifier.size(LoopDimens.IconSize.Small)) },
         )
     }
 
@@ -634,7 +634,7 @@ private fun TrackRow(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = LoopShapes.Card,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         onClick = onClick,
     ) {
@@ -649,15 +649,15 @@ private fun TrackRow(
                 else -> Icons.Default.MusicNote
             }
             Surface(
-                modifier = Modifier.size(40.dp),
-                shape = RoundedCornerShape(100.dp),
+                modifier = Modifier.size(LoopDimens.AvatarSize.Default),
+                shape = LoopShapes.Pill,
                 color = MaterialTheme.colorScheme.surfaceVariant,
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         icon, null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(22.dp),
+                        modifier = Modifier.size(LoopDimens.IconSize.Badge),
                     )
                 }
             }
@@ -665,8 +665,7 @@ private fun TrackRow(
             Column(Modifier.weight(1f)) {
                 Text(
                     track.title,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 15.sp,
+                    style = ListItemTitleStyle,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -679,7 +678,7 @@ private fun TrackRow(
                 }
                 Text(
                     sub,
-                    fontSize = 12.sp,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -714,7 +713,7 @@ private fun SubTrackRow(
     Surface(
         modifier = modifier
             .fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
+        shape = LoopShapes.SubRow,
         color = MaterialTheme.colorScheme.surface,
         onClick = onClick,
     ) {
@@ -726,12 +725,12 @@ private fun SubTrackRow(
                 Icons.Default.PlayArrow,
                 null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(LoopDimens.IconSize.Medium),
             )
             Spacer(Modifier.width(8.dp))
             Text(
                 track.title,
-                fontSize = 13.sp,
+                style = com.coworkapp.loopplayer.ui.theme.ActionLabelStyle,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -749,7 +748,7 @@ private fun SubTrackRow(
                         Icons.Default.PlaylistAdd,
                         contentDescription = "플레이리스트에 추가",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp),
+                        modifier = Modifier.size(LoopDimens.IconSize.Medium),
                     )
                 }
             }
@@ -767,7 +766,7 @@ private fun PermissionNeeded(onRequest: () -> Unit) {
     ) {
         Icon(
             Icons.Default.LibraryMusic, null,
-            modifier = Modifier.size(72.dp),
+            modifier = Modifier.size(LoopDimens.Surface.EmptyMedium),
             tint = MaterialTheme.colorScheme.primary,
         )
         Spacer(Modifier.height(16.dp))
@@ -882,7 +881,7 @@ private fun AddToPlaylistDialog(
                             val already = track.uri in pl.trackUris
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(10.dp),
+                                shape = LoopShapes.SubRow,
                                 color = MaterialTheme.colorScheme.surfaceVariant,
                                 onClick = { if (!already) onPick(pl.id) },
                             ) {
@@ -893,7 +892,7 @@ private fun AddToPlaylistDialog(
                                     Icon(
                                         Icons.Default.QueueMusic, null,
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(20.dp),
+                                        modifier = Modifier.size(LoopDimens.IconSize.Default),
                                     )
                                     Spacer(Modifier.width(10.dp))
                                     Text(
@@ -905,13 +904,13 @@ private fun AddToPlaylistDialog(
                                         Text(
                                             "추가됨",
                                             color = MaterialTheme.colorScheme.primary,
-                                            fontSize = 12.sp,
+                                            style = MaterialTheme.typography.bodySmall,
                                         )
                                     } else {
                                         Text(
                                             "${pl.trackUris.size}곡",
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            fontSize = 12.sp,
+                                            style = MaterialTheme.typography.bodySmall,
                                         )
                                     }
                                 }
@@ -923,7 +922,7 @@ private fun AddToPlaylistDialog(
         },
         confirmButton = {
             TextButton(onClick = onCreateNew) {
-                Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.Add, null, modifier = Modifier.size(LoopDimens.IconSize.Small))
                 Spacer(Modifier.width(4.dp))
                 Text("새 플레이리스트")
             }

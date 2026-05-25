@@ -16,10 +16,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.coworkapp.loopplayer.PlayerUiState
 import com.coworkapp.loopplayer.data.LoopSection
+import com.coworkapp.loopplayer.ui.theme.ActionLabelStyle
+import com.coworkapp.loopplayer.ui.theme.BigButtonLabelStyle
+import com.coworkapp.loopplayer.ui.theme.BigButtonSubStyle
+import com.coworkapp.loopplayer.ui.theme.LoopDimens
+import com.coworkapp.loopplayer.ui.theme.LoopShapes
+import com.coworkapp.loopplayer.ui.theme.MarkerChipValueStyle
 import com.coworkapp.loopplayer.ui.theme.SpeedDisplayStyle
+import com.coworkapp.loopplayer.ui.theme.SpeedPresetStyle
 import com.coworkapp.loopplayer.ui.theme.TimeMainStyle
 import com.coworkapp.loopplayer.ui.theme.TimeSubStyle
 import kotlinx.coroutines.launch
@@ -222,7 +228,7 @@ private fun WaveformCard(
     }
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = LoopShapes.HeroCard,
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
         colors = CardDefaults.elevatedCardColors(
             containerColor = MaterialTheme.colorScheme.surface,
@@ -254,7 +260,7 @@ private fun WaveformCard(
                 onSeekTo      = onSeekTo,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(88.dp)
+                    .height(LoopDimens.Component.Waveform)
                     .padding(vertical = 4.dp),
             )
 
@@ -286,7 +292,7 @@ private fun WaveformCard(
 @Composable
 private fun MarkerChip(label: String, value: String) {
     Surface(
-        shape = RoundedCornerShape(100.dp),
+        shape = LoopShapes.Pill,
         color = MaterialTheme.colorScheme.tertiaryContainer,
     ) {
         Row(
@@ -296,10 +302,8 @@ private fun MarkerChip(label: String, value: String) {
             Text(label, fontWeight = FontWeight.Bold,
                  color = MaterialTheme.colorScheme.onSurface)
             Spacer(Modifier.width(6.dp))
-            Text(value, style = androidx.compose.ui.text.TextStyle(
-                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                fontSize = 12.sp,
-            ), color = MaterialTheme.colorScheme.onSurface)
+            Text(value, style = MarkerChipValueStyle,
+                 color = MaterialTheme.colorScheme.onSurface)
         }
     }
 }
@@ -319,8 +323,8 @@ private fun TransportRow(
     ) {
         OutlinedButton(
             onClick = { onSeekRelative(-5000L) },
-            modifier = Modifier.weight(1f).height(52.dp),
-            shape = RoundedCornerShape(100.dp),
+            modifier = Modifier.weight(1f).height(LoopDimens.Component.TransportButton),
+            shape = LoopShapes.Pill,
         ) {
             Icon(Icons.Default.FastRewind, null)
             Spacer(Modifier.width(4.dp))
@@ -328,19 +332,19 @@ private fun TransportRow(
         }
         FilledIconButton(
             onClick = onTogglePlay,
-            modifier = Modifier.size(64.dp),
-            shape = RoundedCornerShape(20.dp),
+            modifier = Modifier.size(LoopDimens.Surface.PlayButton),
+            shape = LoopShapes.FeatureCard,
         ) {
             Icon(
                 if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                 contentDescription = null,
-                modifier = Modifier.size(32.dp),
+                modifier = Modifier.size(LoopDimens.IconSize.Display),
             )
         }
         OutlinedButton(
             onClick = { onSeekRelative(5000L) },
-            modifier = Modifier.weight(1f).height(52.dp),
-            shape = RoundedCornerShape(100.dp),
+            modifier = Modifier.weight(1f).height(LoopDimens.Component.TransportButton),
+            shape = LoopShapes.Pill,
         ) {
             Text("5초")
             Spacer(Modifier.width(4.dp))
@@ -363,7 +367,7 @@ private fun BigShortcutRow(
 ) {
     val canSave = tempStartMs != null && tempEndMs != null
     Row(
-        Modifier.fillMaxWidth().height(56.dp),
+        Modifier.fillMaxWidth().height(LoopDimens.Component.BigButton),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         BigButton(
@@ -411,7 +415,7 @@ private fun BigButton(
     val containerColor = if (active) color else color.copy(alpha = 0.85f)
     val onColor = MaterialTheme.colorScheme.onPrimary
     Surface(
-        modifier = modifier.clip(RoundedCornerShape(18.dp)),
+        modifier = modifier.clip(LoopShapes.Button),
         color = containerColor,
         onClick = onClick,
         shadowElevation = if (active) 4.dp else 0.dp,
@@ -423,13 +427,12 @@ private fun BigButton(
         ) {
             Text(
                 label,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
+                style = BigButtonLabelStyle,
                 color = onColor,
             )
             Text(
                 sub,
-                fontSize = 11.sp,
+                style = BigButtonSubStyle,
                 color = onColor.copy(alpha = 0.85f),
             )
         }
@@ -442,7 +445,7 @@ private fun BigButton(
 private fun SpeedCard(speed: Float, onSetSpeed: (Float) -> Unit) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = LoopShapes.FeatureCard,
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
         colors = CardDefaults.elevatedCardColors(
             containerColor = MaterialTheme.colorScheme.surface,
@@ -460,9 +463,6 @@ private fun SpeedCard(speed: Float, onSetSpeed: (Float) -> Unit) {
                      style = SpeedDisplayStyle,
                      color = MaterialTheme.colorScheme.primary)
             }
-            // 굵은 dot 표시 안 나오게 steps 제거 → 단일 연속 트랙.
-            // 0.05 단위로 round 해서 너무 잔파리 값으로 가지 않게.
-            // 기본 Material3 슬라이더가 너무 두꺼워서 (트랙 16dp + thumb 20dp) 얇게 커스텀.
             ThinSpeedSlider(
                 speed = speed,
                 onSetSpeed = onSetSpeed,
@@ -477,28 +477,20 @@ private fun SpeedCard(speed: Float, onSetSpeed: (Float) -> Unit) {
                         FilledTonalButton(
                             onClick = { onSetSpeed(v) },
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(100.dp),
+                            shape = LoopShapes.Pill,
                             colors = ButtonDefaults.filledTonalButtonColors(
                                 containerColor = MaterialTheme.colorScheme.primary,
                                 contentColor = MaterialTheme.colorScheme.onPrimary,
                             ),
                             contentPadding = PaddingValues(vertical = 6.dp),
-                        ) { Text("%.2fx".format(v),
-                                style = androidx.compose.ui.text.TextStyle(
-                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                    fontSize = 13.sp,
-                                )) }
+                        ) { Text("%.2fx".format(v), style = SpeedPresetStyle) }
                     } else {
                         OutlinedButton(
                             onClick = { onSetSpeed(v) },
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(100.dp),
+                            shape = LoopShapes.Pill,
                             contentPadding = PaddingValues(vertical = 6.dp),
-                        ) { Text("%.2fx".format(v),
-                                style = androidx.compose.ui.text.TextStyle(
-                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                    fontSize = 13.sp,
-                                )) }
+                        ) { Text("%.2fx".format(v), style = SpeedPresetStyle) }
                     }
                 }
             }
@@ -532,7 +524,7 @@ private fun ThinSlider(
     modifier: Modifier = Modifier,
     trackHeight: Dp = 3.dp,
     thumbDiameter: Dp = 12.dp,
-    touchAreaHeight: Dp = 48.dp,
+    touchAreaHeight: Dp = LoopDimens.Component.TouchTarget,
     activeColor: Color = MaterialTheme.colorScheme.primary,
     inactiveColor: Color = MaterialTheme.colorScheme.surfaceVariant,
 ) {
@@ -611,7 +603,7 @@ private fun EmptyState(onOpenFile: () -> Unit) {
     ) {
         Icon(
             Icons.Default.LibraryMusic, contentDescription = null,
-            modifier = Modifier.size(96.dp),
+            modifier = Modifier.size(LoopDimens.Surface.EmptyLarge),
             tint = MaterialTheme.colorScheme.primary,
         )
         Spacer(Modifier.height(16.dp))
