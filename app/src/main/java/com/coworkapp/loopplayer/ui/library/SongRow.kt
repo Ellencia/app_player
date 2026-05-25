@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,6 +43,7 @@ fun SongRow(
     options: LibraryViewOptions,
     onClick: () -> Unit,
     onLongPress: () -> Unit,
+    onToggleFavorite: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -73,6 +75,8 @@ fun SongRow(
                     )
                     Spacer(Modifier.width(10.dp))
                     DurationMeta(song = song, options = options)
+                    Spacer(Modifier.width(6.dp))
+                    FavToggle(favorite = song.favorite, onClick = onToggleFavorite)
                 }
 
                 Spacer(Modifier.height(4.dp))
@@ -110,6 +114,43 @@ fun SongRow(
         }
         Spacer(Modifier.height(1.dp))
         HorizontalDivider(color = LibraryColors.Divider, thickness = 1.dp)
+    }
+}
+
+@Composable
+private fun FavToggle(favorite: Boolean, onClick: () -> Unit) {
+    // 작은 별 토글. Canvas 로 그려서 Material icon 의존 회피.
+    Box(
+        modifier = Modifier
+            .size(22.dp)
+            .clip(androidx.compose.foundation.shape.CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(modifier = Modifier.size(14.dp)) {
+            val s = size.minDimension
+            val path = androidx.compose.ui.graphics.Path().apply {
+                val cx = s / 2; val cy = s / 2
+                val outer = s * 0.5f; val inner = s * 0.22f
+                for (i in 0 until 10) {
+                    val r = if (i % 2 == 0) outer else inner
+                    val a = (-PI / 2 + i * PI / 5).toFloat()
+                    val x = cx + r * cos(a)
+                    val y = cy + r * sin(a)
+                    if (i == 0) moveTo(x, y) else lineTo(x, y)
+                }
+                close()
+            }
+            if (favorite) {
+                drawPath(path = path, color = LibraryColors.FavStar)
+            } else {
+                drawPath(
+                    path = path,
+                    color = LibraryColors.OnSurfaceMuted,
+                    style = Stroke(width = 1.2f * density),
+                )
+            }
+        }
     }
 }
 

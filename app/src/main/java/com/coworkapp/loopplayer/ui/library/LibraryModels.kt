@@ -95,4 +95,6 @@ data class LibraryUiState(
     val folders:        List<LibraryFolder> = emptyList(),
     val permissionGranted: Boolean = false,
     val loading:        Boolean = false,
+    val searchMode:     Boolean = false,
+    val query:          String  = "",
 )

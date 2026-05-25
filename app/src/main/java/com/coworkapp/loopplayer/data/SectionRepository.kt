@@ -13,7 +13,8 @@ import kotlinx.serialization.json.Json
  * 트랙별 구간 정보를 DataStore에 영구 저장하는 저장소
  * 단순화를 위해 트랙 URI를 key, JSON 직렬화한 LoopSection 리스트를 value로 사용
  */
-private val Context.dataStore by preferencesDataStore(name = "loop_player_prefs")
+// 같은 DataStore 를 TrackMetadataRepository 도 공유 (keys 가 prefix 로 분리됨).
+internal val Context.dataStore by preferencesDataStore(name = "loop_player_prefs")
 
 class SectionRepository(private val context: Context) {
 

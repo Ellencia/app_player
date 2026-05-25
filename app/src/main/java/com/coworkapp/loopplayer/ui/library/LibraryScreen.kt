@@ -37,6 +37,8 @@ import kotlinx.coroutines.launch
 fun LibraryScreen(
     state: LibraryUiState,
     onSearchClick: () -> Unit,
+    onSearchExit: () -> Unit,
+    onQueryChange: (String) -> Unit,
     onSortChange: (LibrarySort) -> Unit,
     onGroupChange: (LibraryGroup) -> Unit,
     onFilterToggle: (LibraryQuickFilter) -> Unit,
@@ -46,6 +48,7 @@ fun LibraryScreen(
     onApplySheet: () -> Unit,
     onSongClick: (LibrarySong) -> Unit,
     onSongLongPress: (LibrarySong) -> Unit,
+    onToggleFavorite: (LibrarySong) -> Unit,
     onNavigate: (LibraryDestination) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -94,6 +97,10 @@ fun LibraryScreen(
                     totalCount    = state.totalCount,
                     totalLoops    = state.totalLoops,
                     totalHours    = state.totalMinutes / 60,
+                    searchMode    = state.searchMode,
+                    query         = state.query,
+                    onQueryChange = onQueryChange,
+                    onSearchExit  = onSearchExit,
                     onDrawerOpen  = { scope.launch { drawerState.open() } },
                     onSearchClick = onSearchClick,
                     onMenuClick   = { sheetOpen = true },
@@ -112,6 +119,7 @@ fun LibraryScreen(
                                 options = state.viewOptions,
                                 onClick = { onSongClick(song) },
                                 onLongPress = { onSongLongPress(song) },
+                                onToggleFavorite = { onToggleFavorite(song) },
                             )
                         }
                     } else {

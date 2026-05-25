@@ -10,6 +10,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.coworkapp.loopplayer.data.LoopSection
 import com.coworkapp.loopplayer.data.SectionRepository
+import com.coworkapp.loopplayer.data.TrackMetadataRepository
 import com.coworkapp.loopplayer.data.WaveformAnalyzer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -45,6 +46,7 @@ data class PlayerUiState(
 class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repo = SectionRepository(app)
+    private val metaRepo = TrackMetadataRepository(app)
     private val waveformAnalyzer = WaveformAnalyzer(app)
 
     /** ExoPlayer 인스턴스 - 액티비티 lifecycle보다 ViewModel이 길어서 여기에 둠 */
@@ -111,6 +113,9 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             player.playbackParameters = PlaybackParameters(1.0f)
             player.prepare()
             player.play()
+
+            // 마지막 연습 시각 갱신 (라이브러리에서 "최근 연습" 정렬 / 메타 표시용)
+            launch(Dispatchers.IO) { metaRepo.touchPracticed(uriStr) }
 
             // 백그라운드에서 파형 분석. 트랙 빠르게 바꾸면 이전 작업 결과는 무시되어야 함
             // → 현재 trackUri와 결과 도착 시점의 trackUri 비교로 가드
@@ -256,6 +261,12 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 loopIdx += 1
                 _uiState.update { it.copy(currentLoopIndex = loopIdx) }
+
+                // 트랙별 누적 반복 카운트 +1 (라이브러리에서 표시)
+                val curUri = _uiState.value.trackUri
+                if (curUri != null) {
+                    launch(Dispatchers.IO) { metaRepo.incrementLoops(curUri, 1) }
+                }
 
                 // 지정 횟수만큼 반복했으면 멈추기 (0 = 무한)
                 if (section.loopCount in 1..loopIdx) {

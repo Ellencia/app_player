@@ -9,9 +9,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -25,6 +28,9 @@ import androidx.compose.foundation.Canvas
 
 /* ─────────────────────────────────────────────────────────────
  * LibraryHeader — 앱 마크(드로어 트리거) · 타이틀 · 검색 · 햄버거
+ *
+ * `searchMode` 가 true 면 타이틀/카운트 자리를 TextField 가 점유 (인라인 검색).
+ * 검색 모드 해제는 우측 X 버튼 또는 query 비우고 onSearchExit() 호출.
  * ───────────────────────────────────────────────────────────── */
 @Composable
 fun LibraryHeader(
@@ -33,10 +39,18 @@ fun LibraryHeader(
     totalCount: Int,
     totalLoops: Int,
     totalHours: Int,
+    searchMode: Boolean,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onSearchExit: () -> Unit,
     onDrawerOpen: () -> Unit,
     onSearchClick: () -> Unit,
     onMenuClick: () -> Unit,
 ) {
+    if (searchMode) {
+        SearchHeader(query = query, onQueryChange = onQueryChange, onExit = onSearchExit)
+        return
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -71,6 +85,98 @@ fun LibraryHeader(
         Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
             HeaderIconButton(onClick = onSearchClick) { SearchIcon() }
             HeaderIconButton(onClick = onMenuClick)   { MenuLinesIcon() }
+        }
+    }
+}
+
+@Composable
+private fun SearchHeader(query: String, onQueryChange: (String) -> Unit, onExit: () -> Unit) {
+    val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+    androidx.compose.runtime.LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 12.dp, end = 12.dp, top = 14.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(CircleShape)
+                .clickable(onClick = onExit),
+            contentAlignment = Alignment.Center,
+        ) {
+            // back arrow (간단 라인)
+            Canvas(modifier = Modifier.size(17.dp)) {
+                val s = size.minDimension
+                drawLine(
+                    color = LibraryColors.OnSurface,
+                    start = Offset(s * 0.78f, s * 0.25f),
+                    end   = Offset(s * 0.30f, s * 0.50f),
+                    strokeWidth = 1.5f * density,
+                    cap = StrokeCap.Round,
+                )
+                drawLine(
+                    color = LibraryColors.OnSurface,
+                    start = Offset(s * 0.30f, s * 0.50f),
+                    end   = Offset(s * 0.78f, s * 0.75f),
+                    strokeWidth = 1.5f * density,
+                    cap = StrokeCap.Round,
+                )
+            }
+        }
+        Spacer(Modifier.width(4.dp))
+        androidx.compose.material3.TextField(
+            value = query,
+            onValueChange = onQueryChange,
+            placeholder = {
+                Text("제목·아티스트·폴더 검색", color = LibraryColors.OnSurfaceMuted)
+            },
+            singleLine = true,
+            modifier = Modifier
+                .weight(1f)
+                .focusRequester(focusRequester),
+            colors = androidx.compose.material3.TextFieldDefaults.colors(
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent,
+                focusedTextColor = LibraryColors.OnSurface,
+                unfocusedTextColor = LibraryColors.OnSurface,
+                cursorColor = LibraryColors.Accent,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+            ),
+            textStyle = androidx.compose.ui.text.TextStyle(
+                fontSize = 16.sp,
+                color = LibraryColors.OnSurface,
+            ),
+        )
+        if (query.isNotEmpty()) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .clickable { onQueryChange("") },
+                contentAlignment = Alignment.Center,
+            ) {
+                // X icon
+                Canvas(modifier = Modifier.size(14.dp)) {
+                    val s = size.minDimension
+                    val stroke = 1.5f * density
+                    drawLine(
+                        color = LibraryColors.OnSurface,
+                        start = Offset(s * 0.20f, s * 0.20f),
+                        end   = Offset(s * 0.80f, s * 0.80f),
+                        strokeWidth = stroke, cap = StrokeCap.Round,
+                    )
+                    drawLine(
+                        color = LibraryColors.OnSurface,
+                        start = Offset(s * 0.80f, s * 0.20f),
+                        end   = Offset(s * 0.20f, s * 0.80f),
+                        strokeWidth = stroke, cap = StrokeCap.Round,
+                    )
+                }
+            }
         }
     }
 }

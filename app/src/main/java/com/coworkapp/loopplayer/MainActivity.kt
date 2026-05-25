@@ -79,7 +79,9 @@ class MainActivity : ComponentActivity() {
                         } else {
                             LibraryScreen(
                                 state = libState,
-                                onSearchClick = { /* TODO: 검색 모드 */ },
+                                onSearchClick = libraryViewModel::enterSearch,
+                                onSearchExit = libraryViewModel::exitSearch,
+                                onQueryChange = libraryViewModel::setQuery,
                                 onSortChange = libraryViewModel::setSort,
                                 onGroupChange = libraryViewModel::setGroup,
                                 onFilterToggle = libraryViewModel::toggleFilter,
@@ -88,14 +90,14 @@ class MainActivity : ComponentActivity() {
                                 onResetSheet = libraryViewModel::resetSheet,
                                 onApplySheet = { /* 시트 적용은 즉시 반영되므로 닫기만 */ },
                                 onSongClick = { song ->
-                                    // LibrarySong.id 는 트랙 URI 문자열
                                     playerViewModel.openTrack(Uri.parse(song.id), song.title)
                                     libraryRequested = false
                                 },
                                 onSongLongPress = { /* TODO: 다중 선택 */ },
+                                onToggleFavorite = { song ->
+                                    libraryViewModel.toggleFavorite(song.id)
+                                },
                                 onNavigate = { dest ->
-                                    // 드로어 목적지 → selectedChip으로 매핑.
-                                    // 1:1 매핑되는 항목만 처리하고 나머지(Stats/Settings 등)는 미구현.
                                     when (dest) {
                                         LibraryDestination.Library    -> libraryViewModel.selectChip("모두")
                                         LibraryDestination.Recordings -> libraryViewModel.selectChip("녹음")

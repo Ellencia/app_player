@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.coworkapp.loopplayer.data.LibraryRepository
 import com.coworkapp.loopplayer.data.MusicTrack
 import com.coworkapp.loopplayer.data.SectionRepository
+import com.coworkapp.loopplayer.data.TrackMetadata
+import com.coworkapp.loopplayer.data.TrackMetadataRepository
 import com.coworkapp.loopplayer.ui.library.LibraryChip
 import com.coworkapp.loopplayer.ui.library.LibraryFolder
 import com.coworkapp.loopplayer.ui.library.LibraryGroup
@@ -40,13 +42,26 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repo = LibraryRepository(app)
     private val sectionRepo = SectionRepository(app)
+    private val metaRepo = TrackMetadataRepository(app)
 
-    /** 원본 트랙 + sectionCount. UI 가공 전 raw 캐시. */
+    /** 원본 트랙 + sectionCount + metadata. UI 가공 전 raw 캐시. */
     private var rawTracks: List<MusicTrack> = emptyList()
     private var sectionCounts: Map<String, Int> = emptyMap()
+    private var metadata: Map<String, TrackMetadata> = emptyMap()
 
     private val _uiState = MutableStateFlow(LibraryUiState())
     val uiState: StateFlow<LibraryUiState> = _uiState.asStateFlow()
+
+    init {
+        // 메타데이터(즐겨찾기·loops·lastPracticed)는 PlayerViewModel·UI 양쪽이 write 하므로
+        // Flow 로 관찰해서 변경 시마다 자동 재계산.
+        viewModelScope.launch {
+            metaRepo.observeAll().collect { map ->
+                metadata = map
+                if (rawTracks.isNotEmpty()) recompute()
+            }
+        }
+    }
 
     fun setPermissionGranted(granted: Boolean) {
         _uiState.update { it.copy(permissionGranted = granted) }
@@ -106,9 +121,36 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
         recompute()
     }
 
+    // ─────────────── 메타데이터 / 검색 ───────────────
+
+    fun toggleFavorite(trackUri: String) {
+        val curFav = metadata[trackUri]?.favorite ?: false
+        viewModelScope.launch { metaRepo.setFavorite(trackUri, !curFav) }
+        // 실제 반영은 metaRepo Flow 가 emit 하면 init 의 collect 로 자동 recompute
+    }
+
+    fun enterSearch() {
+        _uiState.update { it.copy(searchMode = true) }
+    }
+
+    fun exitSearch() {
+        _uiState.update { it.copy(searchMode = false, query = "") }
+        recompute()
+    }
+
+    fun setQuery(q: String) {
+        _uiState.update { it.copy(query = q) }
+        recompute()
+    }
+
     // ─────────────── 핵심: 정렬·필터·칩 적용 후 LibrarySong 리스트 생성 ───────────────
     private fun recompute() {
-        val allSongs = rawTracks.map { it.toLibrarySong(sectionCounts[it.uri] ?: 0) }
+        val allSongs = rawTracks.map {
+            it.toLibrarySong(
+                sectionCount = sectionCounts[it.uri] ?: 0,
+                meta = metadata[it.uri],
+            )
+        }
         val chips = buildChips(allSongs)
         val folders = buildFolders(allSongs)
         val filtered = applyChipAndFilters(allSongs)
@@ -117,7 +159,7 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
             it.copy(
                 songs = sorted,
                 totalCount = allSongs.size,
-                totalLoops = 0, // 미추적
+                totalLoops = allSongs.sumOf { s -> s.loops },
                 totalMinutes = (allSongs.sumOf { s -> s.durationMs } / 60_000L).toInt(),
                 activeCount = allSongs.count { s -> s.isActive },
                 recordingCount = allSongs.count { s -> s.isRecording },
@@ -150,6 +192,16 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
                 LibraryQuickFilter.PracticingOnly -> result.filter { it.isActive }
                 LibraryQuickFilter.NotPracticed -> result.filter { it.lastPracticed == null }
                 LibraryQuickFilter.ManySections -> result.filter { it.sections > 5 }
+            }
+        }
+
+        // 검색 query (제목/아티스트/폴더 부분 일치, 대소문자 무시)
+        val q = state.query.trim()
+        if (q.isNotEmpty()) {
+            result = result.filter {
+                it.title.contains(q, ignoreCase = true) ||
+                    it.artist.contains(q, ignoreCase = true) ||
+                    (it.folder?.contains(q, ignoreCase = true) == true)
             }
         }
         return result
@@ -202,7 +254,7 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
             .map { LibraryFolder(it.key, it.value) }
 
     // ─────────────── MusicTrack → LibrarySong ───────────────
-    private fun MusicTrack.toLibrarySong(sectionCount: Int): LibrarySong {
+    private fun MusicTrack.toLibrarySong(sectionCount: Int, meta: TrackMetadata?): LibrarySong {
         // category 가 있으면 그걸, 없으면 folder 경로의 첫 세그먼트를 폴더명으로.
         val folderName = category ?: folder.split('/').firstOrNull()?.takeIf { it.isNotBlank() }
         return LibrarySong(
@@ -211,14 +263,18 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
             artist = artist,
             durationMs = durationMs,
             sections = sectionCount,
-            lastPracticed = null,            // 추적 미구현
-            loops = 0,                       // 추적 미구현
+            lastPracticed = meta?.lastPracticedMs,
+            loops = meta?.loops ?: 0,
             bpm = null,                      // 메타 없음
             musicKey = null,                 // 메타 없음
             folder = folderName,
             hueDeg = stableHue(artist),
-            favorite = false,                // 저장소 미구현
-            isActive = sectionCount > 0,     // 저장 구간이 있는 트랙을 "연습 중" 으로
+            favorite = meta?.favorite ?: false,
+            // "연습 중" = 저장된 구간이 있거나 최근(예: 7일 내) 연주된 트랙
+            isActive = sectionCount > 0 ||
+                (meta?.lastPracticedMs?.let {
+                    System.currentTimeMillis() - it < 7L * 24 * 3600 * 1000
+                } ?: false),
             isRecording = isCallRecording || isVoiceRecording,
         )
     }
