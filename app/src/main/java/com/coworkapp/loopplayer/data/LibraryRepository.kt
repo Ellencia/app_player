@@ -42,6 +42,17 @@ class LibraryRepository(private val context: Context) {
         "녹음", "음성녹음", "voicenote", "voicememo",
     )
 
+    // 메신저 다운로드 경로 — 음성메시지/녹음으로 추정할 수 있는 보조 신호.
+    // 메신저 경로 자체로는 음악(친구가 공유한 노래)도 포함될 수 있어
+    // duration/아티스트 태그와 함께 휴리스틱으로 사용.
+    private val messengerPathHints = listOf(
+        "kakaotalk", "kakaotalkdownload",
+    )
+
+    // 메신저 음성메시지 길이 상한 가정값.
+    // KakaoTalk 음성메시지는 1분 제한이지만 다른 서비스/포워딩 케이스 여유로 5분.
+    private val messengerVoiceMaxDurationMs = 5 * 60 * 1000L
+
     suspend fun loadAllTracks(): List<MusicTrack> = withContext(Dispatchers.IO) {
         val uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
 
@@ -118,12 +129,22 @@ class LibraryRepository(private val context: Context) {
                     pathLower.contains(kw) || nameLower.contains(kw)
                 }
 
+                // 메신저(카카오톡 등) 휴리스틱: 경로가 메신저 다운로드면서
+                // (아티스트 태그가 비어있거나 5분 미만)이면 음성메시지로 추정.
+                // 같은 폴더의 진짜 음악(메타 있고 충분히 김)은 음악으로 남음.
+                val fromMessenger = messengerPathHints.any { pathLower.contains(it) }
+                val hasNoArtistTag = rawArtist.isNullOrBlank() || rawArtist == "<unknown>"
+                val shortDuration = duration in 1..(messengerVoiceMaxDurationMs - 1)
+                val messengerVoiceHint =
+                    fromMessenger && (hasNoArtistTag || shortDuration)
+
                 // 통화녹음이 음성녹음 키워드와 겹칠 수 있으니 통화를 우선
                 val isCall = matchCall
-                // 명시적 신호(IS_RECORDING 플래그 또는 키워드)만 녹음으로 인정.
-                // 예전엔 !isMusic 폴백이 있었지만, Download 폴더 mp3 등 IS_MUSIC=0인
-                // 일반 음악까지 녹음으로 오분류돼 제거.
-                val isVoice = !isCall && (isRecordingFlag || matchVoice)
+                // 명시적 신호(IS_RECORDING 플래그 또는 키워드)에 메신저 휴리스틱을 더해
+                // 녹음으로 인정.
+                val isVoice = !isCall && (
+                    isRecordingFlag || matchVoice || messengerVoiceHint
+                )
 
                 // 알림/알람/벨소리는 위에서 이미 제외했고, 분류 안 된 나머지(IS_MUSIC=0
                 // 이지만 키워드 없는 mp3 등)는 음악 탭으로 흡수.
