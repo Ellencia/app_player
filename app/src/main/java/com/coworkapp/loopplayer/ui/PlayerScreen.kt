@@ -434,7 +434,6 @@ private fun BigButton(
 
 /* ─────────────────────────  ④  ───────────────────────── */
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SpeedCard(speed: Float, onSetSpeed: (Float) -> Unit) {
     ElevatedCard(
@@ -460,61 +459,9 @@ private fun SpeedCard(speed: Float, onSetSpeed: (Float) -> Unit) {
             // 굵은 dot 표시 안 나오게 steps 제거 → 단일 연속 트랙.
             // 0.05 단위로 round 해서 너무 잔파리 값으로 가지 않게.
             // 기본 Material3 슬라이더가 너무 두꺼워서 (트랙 16dp + thumb 20dp) 얇게 커스텀.
-            Slider(
-                value = speed,
-                valueRange = 0.5f..2.0f,
-                onValueChange = { v -> onSetSpeed((kotlin.math.round(v * 20f) / 20f)) },
-                thumb = {
-                    Box(
-                        Modifier
-                            .size(12.dp)
-                            .background(MaterialTheme.colorScheme.primary, CircleShape)
-                    )
-                },
-                track = { state ->
-                    // 가로: Slider 내부는 thumb를 트랙 안에 가두려고 양 끝에서
-                    //       thumbWidth/2 안쪽으로 배치 → 활성 채움 끝을 thumb 중심 x에 맞춤.
-                    // 세로: Material3 Slider Layout이 thumb·track을 top(Y=0)에 정렬하므로
-                    //       높이가 다르면 중심이 어긋남. track 슬롯을 thumb와 같은 12dp로
-                    //       감싸고 실제 3dp 시각 트랙을 그 안에 수직 중앙 정렬해 회피.
-                    val thumbSize = 12.dp
-                    val visualTrackHeight = 3.dp
-                    val range = state.valueRange.endInclusive - state.valueRange.start
-                    val fraction = if (range > 0f)
-                        ((state.value - state.valueRange.start) / range).coerceIn(0f, 1f)
-                    else 0f
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(thumbSize),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        BoxWithConstraints(
-                            Modifier
-                                .fillMaxWidth()
-                                .height(visualTrackHeight),
-                        ) {
-                            val activeEnd = thumbSize / 2 + (maxWidth - thumbSize) * fraction
-                            Box(
-                                Modifier
-                                    .fillMaxSize()
-                                    .background(
-                                        MaterialTheme.colorScheme.surfaceVariant,
-                                        RoundedCornerShape(2.dp),
-                                    )
-                            )
-                            Box(
-                                Modifier
-                                    .width(activeEnd)
-                                    .fillMaxHeight()
-                                    .background(
-                                        MaterialTheme.colorScheme.primary,
-                                        RoundedCornerShape(2.dp),
-                                    )
-                            )
-                        }
-                    }
-                },
+            ThinSpeedSlider(
+                speed = speed,
+                onSetSpeed = onSetSpeed,
             )
             Row(
                 Modifier.fillMaxWidth(),
@@ -553,6 +500,78 @@ private fun SpeedCard(speed: Float, onSetSpeed: (Float) -> Unit) {
             }
         }
     }
+}
+
+/**
+ * 얇은 속도 슬라이더.
+ *
+ * Material3 Slider는 내부적으로 다음 두 제약을 강제한다:
+ *  1. `requiredSizeIn(minHeight = TrackHeight=16.dp)` — 컴포넌트 최소 높이.
+ *  2. 트랙 슬롯은 `constraints.copy(minHeight=0)`으로 측정 → 12dp 트랙 wrapper는
+ *     12dp 그대로 측정됨.
+ *  3. 썸 슬롯은 원래 constraints로 측정 → wrapper Box가 부모 minHeight=16에 의해
+ *     16dp로 부풀려지고, 안의 12dp 자식은 default `TopStart` 정렬로 위쪽에 배치됨.
+ *
+ * 결과적으로 sliderHeight=max(트랙=12, 썸=16)=16, 트랙은 (16-12)/2=2 offset 후
+ * 안의 시각 트랙이 중앙(Y=8), 썸은 offset 0에 12dp가 top에 붙어 중심 Y=6 → 2dp 어긋남.
+ *
+ * 해결: 썸 modifier에 `wrapContentSize(Alignment.Center)` 를 두어 wrapper가 16dp로
+ * 늘어나더라도 내 12dp 원이 그 16dp 안의 수직 중앙에 자리잡게 한다.
+ * (16.dp 자체를 하드코딩하지 않고 wrapContent에 위임.)
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ThinSpeedSlider(
+    speed: Float,
+    onSetSpeed: (Float) -> Unit,
+) {
+    val thumbDiameter = 12.dp
+    val visualTrackHeight = 3.dp
+    Slider(
+        value = speed,
+        valueRange = 0.5f..2.0f,
+        onValueChange = { v -> onSetSpeed((kotlin.math.round(v * 20f) / 20f)) },
+        thumb = {
+            Spacer(
+                Modifier
+                    .wrapContentSize(Alignment.Center) // wrapper 강제 확장 시 중앙 정렬
+                    .size(thumbDiameter)
+                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+            )
+        },
+        track = { state ->
+            // 가로: thumb 중심 x = trackWidth × fraction (트랙 로컬 좌표).
+            //       활성 채움 끝을 이 위치에 맞춰 중심 일치.
+            val range = state.valueRange.endInclusive - state.valueRange.start
+            val fraction = if (range > 0f)
+                ((state.value - state.valueRange.start) / range).coerceIn(0f, 1f)
+            else 0f
+            BoxWithConstraints(
+                Modifier
+                    .fillMaxWidth()
+                    .height(visualTrackHeight),
+            ) {
+                val activeEnd = maxWidth * fraction
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            MaterialTheme.colorScheme.surfaceVariant,
+                            RoundedCornerShape(2.dp),
+                        )
+                )
+                Box(
+                    Modifier
+                        .width(activeEnd)
+                        .fillMaxHeight()
+                        .background(
+                            MaterialTheme.colorScheme.primary,
+                            RoundedCornerShape(2.dp),
+                        )
+                )
+            }
+        },
+    )
 }
 
 /* ─────────────────────────  Empty state  ───────────────────────── */
