@@ -25,8 +25,12 @@ import com.coworkapp.loopplayer.ui.theme.TimeSubStyle
 import kotlinx.coroutines.launch
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 
 /**
  * Variant A — Polished Material 3 Purple
@@ -503,74 +507,97 @@ private fun SpeedCard(speed: Float, onSetSpeed: (Float) -> Unit) {
 }
 
 /**
- * 얇은 속도 슬라이더.
+ * 얇은 슬라이더. Material3 Slider를 쓰지 않고 Box + pointerInput으로 직접 조립.
  *
- * Material3 Slider는 내부적으로 다음 두 제약을 강제한다:
- *  1. `requiredSizeIn(minHeight = TrackHeight=16.dp)` — 컴포넌트 최소 높이.
- *  2. 트랙 슬롯은 `constraints.copy(minHeight=0)`으로 측정 → 12dp 트랙 wrapper는
- *     12dp 그대로 측정됨.
- *  3. 썸 슬롯은 원래 constraints로 측정 → wrapper Box가 부모 minHeight=16에 의해
- *     16dp로 부풀려지고, 안의 12dp 자식은 default `TopStart` 정렬로 위쪽에 배치됨.
+ * 동기:
+ *  - Material3 Slider는 내부적으로 `requiredSizeIn(minHeight=TrackHeight=16.dp)`로
+ *    컴포넌트 최소 높이를 16dp로 강제하고, 트랙 슬롯과 썸 슬롯을 서로 다른 constraints
+ *    (트랙은 `minHeight=0`, 썸은 원본)로 측정해서 두 자식 박스 높이가 비대칭이 됨.
+ *  - 그 결과 default TopStart 정렬과 맞물려 얇은 커스텀 슬롯이 수직으로 어긋남.
+ *  - 이런 숨은 동작을 우회/추론하기보다 원시 구성으로 가서 모든 치수를 파라미터화함.
  *
- * 결과적으로 sliderHeight=max(트랙=12, 썸=16)=16, 트랙은 (16-12)/2=2 offset 후
- * 안의 시각 트랙이 중앙(Y=8), 썸은 offset 0에 12dp가 top에 붙어 중심 Y=6 → 2dp 어긋남.
+ * 동작:
+ *  - 터치 영역 = `touchAreaHeight` (기본 48dp, 접근성 권장).
+ *  - 모든 시각 요소(비활성 트랙, 활성 트랙, 썸)는 동일 부모 안에서 수직 중앙 정렬.
+ *  - 첫 ACTION_DOWN 즉시 위치 jump + 드래그 동안 연속 갱신.
  *
- * 해결: 썸 modifier에 `wrapContentSize(Alignment.Center)` 를 두어 wrapper가 16dp로
- * 늘어나더라도 내 12dp 원이 그 16dp 안의 수직 중앙에 자리잡게 한다.
- * (16.dp 자체를 하드코딩하지 않고 wrapContent에 위임.)
+ * 한계: Material3 Slider가 제공하는 접근성 시맨틱(SemanticsActions.SetProgress 등)은
+ * 미구현. 개인 앱이라 우선순위 낮음. 필요 시 `Modifier.semantics`로 추가.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ThinSpeedSlider(
-    speed: Float,
-    onSetSpeed: (Float) -> Unit,
+private fun ThinSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    modifier: Modifier = Modifier,
+    trackHeight: Dp = 3.dp,
+    thumbDiameter: Dp = 12.dp,
+    touchAreaHeight: Dp = 48.dp,
+    activeColor: Color = MaterialTheme.colorScheme.primary,
+    inactiveColor: Color = MaterialTheme.colorScheme.surfaceVariant,
 ) {
-    val thumbDiameter = 12.dp
-    val visualTrackHeight = 3.dp
-    Slider(
+    val span = valueRange.endInclusive - valueRange.start
+    val fraction = if (span > 0f)
+        ((value - valueRange.start) / span).coerceIn(0f, 1f)
+    else 0f
+
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(touchAreaHeight)
+            .pointerInput(valueRange, thumbDiameter) {
+                val thumbPx = thumbDiameter.toPx()
+                fun emit(x: Float) {
+                    val effective = size.width - thumbPx
+                    if (effective <= 0f) return
+                    val f = ((x - thumbPx / 2f) / effective).coerceIn(0f, 1f)
+                    onValueChange(valueRange.start + f * span)
+                }
+                awaitEachGesture {
+                    val down = awaitFirstDown()
+                    emit(down.position.x)
+                    down.consume()
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        if (!change.pressed) break
+                        emit(change.position.x)
+                        change.consume()
+                    }
+                }
+            },
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        // 비활성 트랙 (전폭)
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(trackHeight)
+                .background(inactiveColor, RoundedCornerShape(trackHeight / 2))
+        )
+        // 활성 트랙: 0에서 썸 중심 x까지. 썸 중심 = thumbRadius + (width - thumbDiameter) × fraction
+        Box(
+            Modifier
+                .width(thumbDiameter / 2 + (maxWidth - thumbDiameter) * fraction)
+                .height(trackHeight)
+                .background(activeColor, RoundedCornerShape(trackHeight / 2))
+        )
+        // 썸: 좌측 모서리 = (width - thumbDiameter) × fraction
+        Box(
+            Modifier
+                .offset(x = (maxWidth - thumbDiameter) * fraction)
+                .size(thumbDiameter)
+                .background(activeColor, CircleShape)
+        )
+    }
+}
+
+@Composable
+private fun ThinSpeedSlider(speed: Float, onSetSpeed: (Float) -> Unit) {
+    ThinSlider(
         value = speed,
-        valueRange = 0.5f..2.0f,
         onValueChange = { v -> onSetSpeed((kotlin.math.round(v * 20f) / 20f)) },
-        thumb = {
-            Spacer(
-                Modifier
-                    .wrapContentSize(Alignment.Center) // wrapper 강제 확장 시 중앙 정렬
-                    .size(thumbDiameter)
-                    .background(MaterialTheme.colorScheme.primary, CircleShape)
-            )
-        },
-        track = { state ->
-            // 가로: thumb 중심 x = trackWidth × fraction (트랙 로컬 좌표).
-            //       활성 채움 끝을 이 위치에 맞춰 중심 일치.
-            val range = state.valueRange.endInclusive - state.valueRange.start
-            val fraction = if (range > 0f)
-                ((state.value - state.valueRange.start) / range).coerceIn(0f, 1f)
-            else 0f
-            BoxWithConstraints(
-                Modifier
-                    .fillMaxWidth()
-                    .height(visualTrackHeight),
-            ) {
-                val activeEnd = maxWidth * fraction
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .background(
-                            MaterialTheme.colorScheme.surfaceVariant,
-                            RoundedCornerShape(2.dp),
-                        )
-                )
-                Box(
-                    Modifier
-                        .width(activeEnd)
-                        .fillMaxHeight()
-                        .background(
-                            MaterialTheme.colorScheme.primary,
-                            RoundedCornerShape(2.dp),
-                        )
-                )
-            }
-        },
+        valueRange = 0.5f..2.0f,
     )
 }
 
