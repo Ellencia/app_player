@@ -45,13 +45,15 @@ fun WaveformProgressBar(
     onSeekTo: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val unplayed = MaterialTheme.colorScheme.outlineVariant
-    val played   = MaterialTheme.colorScheme.onSurfaceVariant
-    val active   = MaterialTheme.colorScheme.primary
-    val temp     = MaterialTheme.colorScheme.tertiary
-    val playhead = MaterialTheme.colorScheme.primary
-    val labelOnTemp = MaterialTheme.colorScheme.onTertiary
-    val surface  = MaterialTheme.colorScheme.surface
+    // 파형 색은 의미별로 LoopColors에서 직접 가져옴 — outlineVariant 등 일반
+    // colorScheme 토큰은 너무 얇아서 파형 가독성이 떨어짐.
+    val unplayed = LoopColors.WaveUnplayed
+    val played   = LoopColors.WavePlayed
+    val active   = LoopColors.WaveActive
+    val temp     = LoopColors.WaveTemp
+    val playhead = LoopColors.Primary
+    val labelOnTemp = LoopColors.OnTertiary
+    val surface  = LoopColors.Background
 
     val measurer = rememberTextMeasurer()
     val labelStyle = remember(labelOnTemp) {

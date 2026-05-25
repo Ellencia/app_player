@@ -1,19 +1,24 @@
 package com.coworkapp.loopplayer.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 
-private val LightColors = lightColorScheme(
+/**
+ * 다크 + 라임 단일 테마. 라이트 모드는 지원하지 않음 (라이브러리 디자인이 다크 전용).
+ *
+ * Player·Library 양쪽이 같은 [LoopColors] 팔레트를 공유:
+ *  - Player 는 MaterialTheme.colorScheme 경유 (자동 반영)
+ *  - Library 는 [com.coworkapp.loopplayer.ui.library.LibraryColors] 직접 참조 (동일 hex)
+ */
+private val DarkColors = darkColorScheme(
     background         = LoopColors.Background,
     surface            = LoopColors.Surface,
-    surfaceVariant     = LoopColors.SurfaceContainer,
+    surfaceVariant     = LoopColors.SurfaceVariant,
     onSurface          = LoopColors.Ink,
     onSurfaceVariant   = LoopColors.InkSoft,
     outline            = LoopColors.Outline,
-    outlineVariant     = LoopColors.SurfaceVariant,
+    outlineVariant     = LoopColors.OutlineVariant,
 
     primary            = LoopColors.Primary,
     onPrimary          = LoopColors.OnPrimary,
@@ -28,31 +33,10 @@ private val LightColors = lightColorScheme(
     tertiaryContainer  = LoopColors.TertiaryContainer,
 )
 
-// 다크: 라이트와 같은 톤을 유지하되 명도만 반전
-private val DarkColors = darkColorScheme(
-    background         = androidx.compose.ui.graphics.Color(0xFF141218),
-    surface            = androidx.compose.ui.graphics.Color(0xFF1D1B20),
-    surfaceVariant     = androidx.compose.ui.graphics.Color(0xFF2B2930),
-    onSurface          = androidx.compose.ui.graphics.Color(0xFFE6E1E5),
-    onSurfaceVariant   = androidx.compose.ui.graphics.Color(0xFFCAC4D0),
-
-    primary            = androidx.compose.ui.graphics.Color(0xFFD0BCFF),
-    onPrimary          = androidx.compose.ui.graphics.Color(0xFF381E72),
-    primaryContainer   = androidx.compose.ui.graphics.Color(0xFF4F378B),
-    onPrimaryContainer = androidx.compose.ui.graphics.Color(0xFFEADDFF),
-
-    secondary          = androidx.compose.ui.graphics.Color(0xFFCCC2DC),
-    tertiary           = androidx.compose.ui.graphics.Color(0xFFEFB8C8),
-    tertiaryContainer  = androidx.compose.ui.graphics.Color(0xFF633B48),
-)
-
 @Composable
-fun LoopPlayerTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    content: @Composable () -> Unit,
-) {
+fun LoopPlayerTheme(content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = if (darkTheme) DarkColors else LightColors,
+        colorScheme = DarkColors,
         typography  = LoopTypography,
         content     = content,
     )
