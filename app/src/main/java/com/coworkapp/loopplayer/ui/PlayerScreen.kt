@@ -472,37 +472,47 @@ private fun SpeedCard(speed: Float, onSetSpeed: (Float) -> Unit) {
                     )
                 },
                 track = { state ->
-                    // Slider 내부는 thumb를 트랙 안에 가두려고 양 끝에서 thumbWidth/2 안쪽으로
-                    // 배치하므로, 활성 채움 끝을 thumb의 가운데 x좌표에 정확히 맞춰야
-                    // 두 중심이 일치함.
-                    val thumbWidth = 12.dp
+                    // 가로: Slider 내부는 thumb를 트랙 안에 가두려고 양 끝에서
+                    //       thumbWidth/2 안쪽으로 배치 → 활성 채움 끝을 thumb 중심 x에 맞춤.
+                    // 세로: Material3 Slider Layout이 thumb·track을 top(Y=0)에 정렬하므로
+                    //       높이가 다르면 중심이 어긋남. track 슬롯을 thumb와 같은 12dp로
+                    //       감싸고 실제 3dp 시각 트랙을 그 안에 수직 중앙 정렬해 회피.
+                    val thumbSize = 12.dp
+                    val visualTrackHeight = 3.dp
                     val range = state.valueRange.endInclusive - state.valueRange.start
                     val fraction = if (range > 0f)
                         ((state.value - state.valueRange.start) / range).coerceIn(0f, 1f)
                     else 0f
-                    BoxWithConstraints(
-                        Modifier
+                    Box(
+                        modifier = Modifier
                             .fillMaxWidth()
-                            .height(3.dp),
+                            .height(thumbSize),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        val activeEnd = thumbWidth / 2 + (maxWidth - thumbWidth) * fraction
-                        Box(
+                        BoxWithConstraints(
                             Modifier
-                                .fillMaxSize()
-                                .background(
-                                    MaterialTheme.colorScheme.surfaceVariant,
-                                    RoundedCornerShape(2.dp),
-                                )
-                        )
-                        Box(
-                            Modifier
-                                .width(activeEnd)
-                                .fillMaxHeight()
-                                .background(
-                                    MaterialTheme.colorScheme.primary,
-                                    RoundedCornerShape(2.dp),
-                                )
-                        )
+                                .fillMaxWidth()
+                                .height(visualTrackHeight),
+                        ) {
+                            val activeEnd = thumbSize / 2 + (maxWidth - thumbSize) * fraction
+                            Box(
+                                Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        MaterialTheme.colorScheme.surfaceVariant,
+                                        RoundedCornerShape(2.dp),
+                                    )
+                            )
+                            Box(
+                                Modifier
+                                    .width(activeEnd)
+                                    .fillMaxHeight()
+                                    .background(
+                                        MaterialTheme.colorScheme.primary,
+                                        RoundedCornerShape(2.dp),
+                                    )
+                            )
+                        }
                     }
                 },
             )
