@@ -3,6 +3,7 @@ package com.coworkapp.loopplayer.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -433,6 +434,7 @@ private fun BigButton(
 
 /* ─────────────────────────  ④  ───────────────────────── */
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SpeedCard(speed: Float, onSetSpeed: (Float) -> Unit) {
     ElevatedCard(
@@ -457,10 +459,43 @@ private fun SpeedCard(speed: Float, onSetSpeed: (Float) -> Unit) {
             }
             // 굵은 dot 표시 안 나오게 steps 제거 → 단일 연속 트랙.
             // 0.05 단위로 round 해서 너무 잔파리 값으로 가지 않게.
+            // 기본 Material3 슬라이더가 너무 두꺼워서 (트랙 16dp + thumb 20dp) 얇게 커스텀.
             Slider(
                 value = speed,
                 valueRange = 0.5f..2.0f,
                 onValueChange = { v -> onSetSpeed((kotlin.math.round(v * 20f) / 20f)) },
+                thumb = {
+                    Box(
+                        Modifier
+                            .size(12.dp)
+                            .background(MaterialTheme.colorScheme.primary, CircleShape)
+                    )
+                },
+                track = { state ->
+                    val range = state.valueRange.endInclusive - state.valueRange.start
+                    val fraction = if (range > 0f)
+                        ((state.value - state.valueRange.start) / range).coerceIn(0f, 1f)
+                    else 0f
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(3.dp)
+                            .background(
+                                MaterialTheme.colorScheme.surfaceVariant,
+                                RoundedCornerShape(2.dp),
+                            )
+                    ) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth(fraction)
+                                .fillMaxHeight()
+                                .background(
+                                    MaterialTheme.colorScheme.primary,
+                                    RoundedCornerShape(2.dp),
+                                )
+                        )
+                    }
+                },
             )
             Row(
                 Modifier.fillMaxWidth(),
