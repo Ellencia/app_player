@@ -120,14 +120,13 @@ class LibraryRepository(private val context: Context) {
 
                 // 통화녹음이 음성녹음 키워드와 겹칠 수 있으니 통화를 우선
                 val isCall = matchCall
-                val isVoice = !isCall && (
-                    isRecordingFlag || matchVoice ||
-                        // IS_MUSIC=0 이고 위에서 알림/알람/벨소리 다 걸러진 상태면 녹음으로 추정
-                        !isMusic
-                    )
+                // 명시적 신호(IS_RECORDING 플래그 또는 키워드)만 녹음으로 인정.
+                // 예전엔 !isMusic 폴백이 있었지만, Download 폴더 mp3 등 IS_MUSIC=0인
+                // 일반 음악까지 녹음으로 오분류돼 제거.
+                val isVoice = !isCall && (isRecordingFlag || matchVoice)
 
-                // 음악도 아니고 녹음도 아닌 항목은 (예: 효과음으로 분류된 mp3) 제외
-                if (!isCall && !isVoice && !isMusic) continue
+                // 알림/알람/벨소리는 위에서 이미 제외했고, 분류 안 된 나머지(IS_MUSIC=0
+                // 이지만 키워드 없는 mp3 등)는 음악 탭으로 흡수.
 
                 val folder = relPath.trim('/').takeIf { it.isNotEmpty() } ?: "기타"
                 // 카테고리: 폴더 경로의 마지막 세그먼트
