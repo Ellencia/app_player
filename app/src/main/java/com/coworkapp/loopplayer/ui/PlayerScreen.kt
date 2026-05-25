@@ -472,22 +472,31 @@ private fun SpeedCard(speed: Float, onSetSpeed: (Float) -> Unit) {
                     )
                 },
                 track = { state ->
+                    // Slider 내부는 thumb를 트랙 안에 가두려고 양 끝에서 thumbWidth/2 안쪽으로
+                    // 배치하므로, 활성 채움 끝을 thumb의 가운데 x좌표에 정확히 맞춰야
+                    // 두 중심이 일치함.
+                    val thumbWidth = 12.dp
                     val range = state.valueRange.endInclusive - state.valueRange.start
                     val fraction = if (range > 0f)
                         ((state.value - state.valueRange.start) / range).coerceIn(0f, 1f)
                     else 0f
-                    Box(
+                    BoxWithConstraints(
                         Modifier
                             .fillMaxWidth()
-                            .height(3.dp)
-                            .background(
-                                MaterialTheme.colorScheme.surfaceVariant,
-                                RoundedCornerShape(2.dp),
-                            )
+                            .height(3.dp),
                     ) {
+                        val activeEnd = thumbWidth / 2 + (maxWidth - thumbWidth) * fraction
                         Box(
                             Modifier
-                                .fillMaxWidth(fraction)
+                                .fillMaxSize()
+                                .background(
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                    RoundedCornerShape(2.dp),
+                                )
+                        )
+                        Box(
+                            Modifier
+                                .width(activeEnd)
                                 .fillMaxHeight()
                                 .background(
                                     MaterialTheme.colorScheme.primary,
