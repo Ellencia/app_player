@@ -17,7 +17,7 @@ object LoopDimens {
         val Medium  = 18.dp   // 보조 행의 아이콘
         val Default = 20.dp   // 일반 아이콘 (transport, badge 안 등)
         val Badge   = 22.dp   // 배지 원 안 글리프
-        val Display = 32.dp   // 메인 Play 아이콘 (64dp 버튼 안)
+        val Display = 22.dp   // 메인 Play 아이콘 (45dp 버튼 안, 70% 축소)
     }
 
     object AvatarSize {
@@ -26,14 +26,14 @@ object LoopDimens {
     }
 
     object Surface {
-        val PlayButton  = 64.dp   // 메인 Play 토글 버튼
+        val PlayButton  = 45.dp   // 메인 Play 토글 버튼 (기존 64dp의 70%)
         val EmptySmall  = 64.dp   // 작은 빈 상태 아이콘
         val EmptyMedium = 72.dp   // 중간 빈 상태 아이콘
         val EmptyLarge  = 96.dp   // 큰 빈 상태 아이콘
     }
 
     object Component {
-        val TransportButton = 52.dp  // ±5초 버튼
+        val TransportButton = 36.dp  // ±5초 버튼 (기존 52dp의 70%)
         val BigButton       = 56.dp  // A/B/R 빅 단축 버튼 행
         val Waveform        = 88.dp  // 파형 프로그레스 바
         val TouchTarget     = 48.dp  // 슬라이더 등 최소 터치 영역
