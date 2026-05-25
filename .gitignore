@@ -13,3 +13,6 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# UI 포팅/시안 작업 폴더 — 실제 앱 코드에 수동 반영 후 사용
+/kotlin_port/
