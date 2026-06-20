@@ -68,14 +68,19 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
         if (granted && rawTracks.isEmpty()) refresh()
     }
 
+    /**
+     * MediaStore 재스캔. 라이브러리 진입/복귀 시마다 호출되어 새로 추가된 곡을 반영.
+     * 이미 목록이 있으면(첫 로드 아님) 로딩 스피너 없이 조용히 갱신 — 평소엔 티 안 남.
+     */
     fun refresh() {
         if (!_uiState.value.permissionGranted) return
-        _uiState.update { it.copy(loading = true) }
+        val firstLoad = rawTracks.isEmpty()
+        if (firstLoad) _uiState.update { it.copy(loading = true) }
         viewModelScope.launch {
             rawTracks = repo.loadAllTracks()
             sectionCounts = sectionRepo.getAllSectionCounts()
             recompute()
-            _uiState.update { it.copy(loading = false) }
+            if (firstLoad) _uiState.update { it.copy(loading = false) }
         }
     }
 

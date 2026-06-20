@@ -16,6 +16,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,6 +56,15 @@ class MainActivity : ComponentActivity() {
         libraryViewModel.setPermissionGranted(granted)
     }
 
+    override fun onResume() {
+        super.onResume()
+        // 다른 앱(파일 매니저 등)에서 곡을 넣고 우리 앱으로 돌아오면 재스캔.
+        if (hasMediaPermission()) {
+            libraryViewModel.setPermissionGranted(true)
+            libraryViewModel.refresh()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         libraryViewModel.setPermissionGranted(hasMediaPermission())
@@ -67,6 +77,13 @@ class MainActivity : ComponentActivity() {
 
                     var libraryRequested by remember { mutableStateOf(true) }
                     val showLibrary = libraryRequested || !hasTrack
+
+                    // 라이브러리가 보이게 될 때(앱 시작·플레이어→복귀)마다 조용히 재스캔
+                    LaunchedEffect(showLibrary) {
+                        if (showLibrary && hasMediaPermission()) {
+                            libraryViewModel.refresh()
+                        }
+                    }
 
                     if (showLibrary) {
                         val libState by libraryViewModel.uiState.collectAsState()
