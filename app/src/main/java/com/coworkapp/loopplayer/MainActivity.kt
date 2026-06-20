@@ -30,6 +30,7 @@ import com.coworkapp.loopplayer.ui.PlayerScreen
 import com.coworkapp.loopplayer.ui.library.LibraryColors
 import com.coworkapp.loopplayer.ui.library.LibraryDestination
 import com.coworkapp.loopplayer.ui.library.LibraryScreen
+import com.coworkapp.loopplayer.ui.library.LibrarySort
 import com.coworkapp.loopplayer.ui.theme.LoopPlayerTheme
 
 class MainActivity : ComponentActivity() {
@@ -99,10 +100,17 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onNavigate = { dest ->
                                     when (dest) {
-                                        LibraryDestination.Library    -> libraryViewModel.selectChip("모두")
+                                        LibraryDestination.Library -> {
+                                            libraryViewModel.selectChip("모두")
+                                            libraryViewModel.setSort(LibrarySort.RecentlyAdded)
+                                        }
                                         LibraryDestination.Recordings -> libraryViewModel.selectChip("녹음")
                                         LibraryDestination.Favorites  -> libraryViewModel.selectChip("★")
-                                        else -> { /* TODO */ }
+                                        LibraryDestination.RecentPractice -> {
+                                            libraryViewModel.selectChip("모두")
+                                            libraryViewModel.setSort(LibrarySort.RecentPractice)
+                                        }
+                                        else -> { /* 나머지 destination 은 드로어에서 제거됨 */ }
                                     }
                                 },
                             )

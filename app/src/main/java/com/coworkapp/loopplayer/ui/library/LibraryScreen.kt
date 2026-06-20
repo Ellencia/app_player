@@ -69,17 +69,19 @@ fun LibraryScreen(
                 modifier             = Modifier.width(332.dp),
             ) {
                 NavigationDrawerContent(
-                    todayMinutes = 0,
-                    streakDays   = 0,
-                    todaySongs   = 0,
-                    todayLoops   = 0,
                     counts       = state.toDrawerCounts(),
                     activeDestination = when (state.selectedChip) {
                         "녹음" -> LibraryDestination.Recordings
                         "★"    -> LibraryDestination.Favorites
-                        else   -> LibraryDestination.Library
+                        else   -> if (state.sort == LibrarySort.RecentPractice && state.selectedChip == "모두")
+                            LibraryDestination.RecentPractice
+                        else LibraryDestination.Library
                     },
                     onNavigate   = { dest -> scope.launch { drawerState.close() }; onNavigate(dest) },
+                    onFolderSelect = { name ->
+                        scope.launch { drawerState.close() }
+                        onChipSelect(name)
+                    },
                     onClose      = { scope.launch { drawerState.close() } },
                 )
             }
@@ -92,8 +94,6 @@ fun LibraryScreen(
         ) {
             Column(Modifier.fillMaxSize()) {
                 LibraryHeader(
-                    streakDays    = 0,
-                    streakOutOf   = 7,
                     totalCount    = state.totalCount,
                     totalLoops    = state.totalLoops,
                     totalHours    = state.totalMinutes / 60,

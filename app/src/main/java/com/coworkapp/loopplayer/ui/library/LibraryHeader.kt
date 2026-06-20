@@ -34,8 +34,6 @@ import androidx.compose.foundation.Canvas
  * ───────────────────────────────────────────────────────────── */
 @Composable
 fun LibraryHeader(
-    streakDays: Int,
-    streakOutOf: Int,
     totalCount: Int,
     totalLoops: Int,
     totalHours: Int,
@@ -63,7 +61,7 @@ fun LibraryHeader(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.weight(1f),
         ) {
-            DrawerTrigger(streakDays = streakDays, streakOutOf = streakOutOf, onClick = onDrawerOpen)
+            DrawerTrigger(onClick = onDrawerOpen)
             Column {
                 Text(
                     text = "라이브러리",
@@ -182,7 +180,8 @@ private fun SearchHeader(query: String, onQueryChange: (String) -> Unit, onExit:
 }
 
 @Composable
-private fun DrawerTrigger(streakDays: Int, streakOutOf: Int, onClick: () -> Unit) {
+private fun DrawerTrigger(onClick: () -> Unit) {
+    // streak ring 제거 — 연습 통계 데이터를 추적하지 않으므로 앱마크만.
     Box(
         modifier = Modifier
             .size(38.dp)
@@ -190,35 +189,10 @@ private fun DrawerTrigger(streakDays: Int, streakOutOf: Int, onClick: () -> Unit
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        // streak ring
-        Canvas(modifier = Modifier.matchParentSize()) {
-            val stroke = Stroke(width = 1.4f * density, cap = StrokeCap.Round)
-            // base ring
-            drawCircle(
-                color = Color(0x2EC7E463),
-                radius = size.minDimension / 2 - stroke.width / 2,
-                style  = Stroke(width = 1f * density),
-            )
-            // progress arc
-            val sweep = 360f * (streakDays.coerceAtMost(streakOutOf).toFloat() / streakOutOf.toFloat())
-            drawArc(
-                color    = LibraryColors.Accent,
-                startAngle = -90f,
-                sweepAngle = sweep,
-                useCenter  = false,
-                topLeft    = Offset(stroke.width / 2, stroke.width / 2),
-                size       = androidx.compose.ui.geometry.Size(
-                    size.width - stroke.width,
-                    size.height - stroke.width,
-                ),
-                style = stroke,
-            )
-        }
-        // app mark (lime gradient + bars)
         Box(
             modifier = Modifier
-                .size(28.dp)
-                .clip(RoundedCornerShape(8.dp))
+                .size(30.dp)
+                .clip(RoundedCornerShape(9.dp))
                 .background(
                     Brush.linearGradient(
                         colors = listOf(Color(0xFFC7E463), Color(0xFF6D8F24)),

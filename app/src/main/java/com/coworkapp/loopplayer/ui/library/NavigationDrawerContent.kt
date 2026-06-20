@@ -26,17 +26,16 @@ import androidx.compose.ui.unit.sp
 
 /**
  * 좌측 ModalNavigationDrawer 의 컨텐츠.
- * 브랜드 바 · TODAY 카드 · 메인 nav · 폴더 섹션 · 세컨더리 · 푸터(storage)
+ * 브랜드 바 · 메인 nav(라이브러리/녹음/즐겨찾기/최근연습) · 폴더 섹션.
+ *
+ * 실제 동작하는 항목만 노출 (가짜 TODAY/STORAGE 카드, 미구현 메뉴 제거).
  */
 @Composable
 fun NavigationDrawerContent(
-    todayMinutes: Int,
-    streakDays: Int,
-    todaySongs: Int,
-    todayLoops: Int,
     counts: DrawerCounts,
     activeDestination: LibraryDestination,
     onNavigate: (LibraryDestination) -> Unit,
+    onFolderSelect: (String) -> Unit,
     onClose: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize().background(LibraryColors.Surface)) {
@@ -59,44 +58,23 @@ fun NavigationDrawerContent(
                         .background(Brush.linearGradient(listOf(Color(0xFFC7E463), Color(0xFF6D8F24)))),
                     contentAlignment = Alignment.Center,
                 ) { BarsGlyph(color = Color(0xFF0A0B0B)) }
-                Column {
-                    Text("구간반복 플레이어",
-                        color = LibraryColors.OnSurface,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = (-0.3).sp,
-                    )
-                    Text("v 2.4.1",
-                        color = LibraryColors.OnSurfaceMuted,
-                        fontSize = 10.5.sp,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 0.3.sp,
-                        modifier = Modifier.padding(top = 1.dp),
-                    )
-                }
+                Text("구간반복 플레이어",
+                    color = LibraryColors.OnSurface,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.3).sp,
+                )
             }
             CloseButton(onClose)
         }
         HorizontalDivider(color = LibraryColors.Divider)
-
-        // TODAY card
-        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
-            TodayCard(
-                minutes  = todayMinutes,
-                streak   = streakDays,
-                songs    = todaySongs,
-                loops    = todayLoops,
-                weekBars = listOf(0.4f, 0.7f, 0.55f, 0.85f, 1f, 0.3f, 0f),
-                todayIdx = 4,
-            )
-        }
 
         // Main nav list (scrollable middle area)
         Column(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 10.dp),
+                .padding(horizontal = 10.dp, vertical = 8.dp),
         ) {
             DrawerNavRow("library",  "라이브러리",   counts.libraryCount,
                 active = activeDestination == LibraryDestination.Library,
@@ -105,103 +83,38 @@ fun NavigationDrawerContent(
             DrawerNavRow("mic",      "녹음",          counts.recordings,
                 active = activeDestination == LibraryDestination.Recordings,
                 onClick = { onNavigate(LibraryDestination.Recordings) })
-            DrawerNavRow("playlist", "플레이리스트",   counts.playlists,
-                active = activeDestination == LibraryDestination.Playlists,
-                onClick = { onNavigate(LibraryDestination.Playlists) })
             DrawerNavRow("star",     "즐겨찾기",      counts.favorites,
                 active = activeDestination == LibraryDestination.Favorites,
                 onClick = { onNavigate(LibraryDestination.Favorites) })
             DrawerNavRow("clock",    "최근 연습",     null,
                 active = activeDestination == LibraryDestination.RecentPractice,
                 onClick = { onNavigate(LibraryDestination.RecentPractice) })
-            DrawerNavRow("stats",    "연습 통계",     null,
-                active = activeDestination == LibraryDestination.Stats,
-                onClick = { onNavigate(LibraryDestination.Stats) })
 
-            // FOLDERS
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("FOLDERS",
-                    color = LibraryColors.OnSurfaceMuted,
-                    fontSize = 10.sp,
-                    letterSpacing = 1.4.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                )
-                Text("${counts.folders.size}",
-                    color = LibraryColors.OnSurfaceMuted,
-                    fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace,
-                )
-            }
-            counts.folders.forEach { (name, n) ->
-                FolderRow(name = name, count = n, onClick = { onNavigate(LibraryDestination.Folder) })
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) {
-                    Text("+", color = LibraryColors.OnSurfaceMuted, fontSize = 16.sp)
-                }
-                Text("폴더 추가", color = LibraryColors.OnSurfaceMuted, fontSize = 12.sp)
-            }
-
-            Spacer(Modifier.height(14.dp))
-            HorizontalDivider(color = LibraryColors.Divider)
-            Spacer(Modifier.height(10.dp))
-
-            DrawerNavRow("import",   "파일 가져오기", null,
-                onClick = { onNavigate(LibraryDestination.ImportFiles) })
-            DrawerNavRow("settings", "설정",         null,
-                onClick = { onNavigate(LibraryDestination.Settings) })
-            DrawerNavRow("help",     "도움말",       null,
-                onClick = { onNavigate(LibraryDestination.Help) })
-            DrawerNavRow("info",     "앱 정보",       null,
-                onClick = { onNavigate(LibraryDestination.AppInfo) })
-        }
-
-        // Footer storage
-        HorizontalDivider(color = LibraryColors.Divider)
-        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text("STORAGE",
-                    color = LibraryColors.OnSurfaceMuted,
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                    letterSpacing = 0.6.sp,
-                )
-                Text("2.4 / 8 GB",
-                    color = LibraryColors.OnSurfaceMuted,
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                )
-            }
-            Spacer(Modifier.height(6.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(3.dp)
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(Color(0x14FFFFFF)),
-            ) {
-                Box(
+            // FOLDERS (실제 인덱싱된 폴더만, 비어있으면 섹션 자체 숨김)
+            if (counts.folders.isNotEmpty()) {
+                Row(
                     modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(0.30f)
-                        .background(LibraryColors.Accent),
-                )
+                        .fillMaxWidth()
+                        .padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("FOLDERS",
+                        color = LibraryColors.OnSurfaceMuted,
+                        fontSize = 10.sp,
+                        letterSpacing = 1.4.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                    )
+                    Text("${counts.folders.size}",
+                        color = LibraryColors.OnSurfaceMuted,
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace,
+                    )
+                }
+                counts.folders.forEach { (name, n) ->
+                    FolderRow(name = name, count = n, onClick = { onFolderSelect(name) })
+                }
             }
         }
     }
@@ -225,99 +138,6 @@ private fun CloseButton(onClose: () -> Unit) {
             val stroke = 1.5.dp.toPx()
             drawLine(LibraryColors.OnSurfaceMuted, Offset(s * 0.2f, s * 0.2f), Offset(s * 0.8f, s * 0.8f), stroke)
             drawLine(LibraryColors.OnSurfaceMuted, Offset(s * 0.8f, s * 0.2f), Offset(s * 0.2f, s * 0.8f), stroke)
-        }
-    }
-}
-
-@Composable
-private fun TodayCard(
-    minutes: Int,
-    streak: Int,
-    songs: Int,
-    loops: Int,
-    weekBars: List<Float>,
-    todayIdx: Int,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(Brush.linearGradient(listOf(Color(0x1AC7E463), Color(0x06C7E463))))
-            .border(1.dp, Color(0x2EC7E463), RoundedCornerShape(14.dp))
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Bottom,
-        ) {
-            Text("TODAY",
-                color = LibraryColors.Accent,
-                fontSize = 10.sp,
-                letterSpacing = 1.4.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
-            )
-            Row {
-                Text("연속 ", color = LibraryColors.OnSurfaceMuted, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-                Text("$streak", color = LibraryColors.Accent, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                Text("일", color = LibraryColors.OnSurfaceMuted, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-            }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-            verticalAlignment = Alignment.Bottom,
-        ) {
-            Text("$minutes",
-                color = LibraryColors.OnSurface,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = (-1).sp,
-            )
-            Text("분", color = LibraryColors.OnSurfaceMuted, fontSize = 13.sp, modifier = Modifier.padding(start = 2.dp, bottom = 4.dp))
-            Spacer(Modifier.weight(1f))
-            Text(
-                buildString {
-                    append("$songs 곡 · ")
-                    append("$loops 회 반복")
-                },
-                color = LibraryColors.OnSurfaceMuted,
-                fontSize = 11.sp,
-                modifier = Modifier.padding(bottom = 4.dp),
-            )
-        }
-        // 7-day mini bars
-        Row(
-            modifier = Modifier.fillMaxWidth().height(18.dp).padding(top = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(3.dp),
-            verticalAlignment = Alignment.Bottom,
-        ) {
-            weekBars.forEachIndexed { i, v ->
-                val color = when {
-                    i == todayIdx -> LibraryColors.Accent
-                    v == 0f       -> Color(0x14FFFFFF)
-                    else          -> Color(0x52C7E463)
-                }
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(maxOf(0.12f, v))
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(color),
-                )
-            }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            listOf("월","화","수","목","금","토","일").forEach {
-                Text(it,
-                    color = LibraryColors.OnSurfaceFaint,
-                    fontSize = 9.sp,
-                    fontFamily = FontFamily.Monospace,
-                )
-            }
         }
     }
 }
