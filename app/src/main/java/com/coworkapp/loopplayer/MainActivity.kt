@@ -31,6 +31,7 @@ import com.coworkapp.loopplayer.ui.library.LibraryColors
 import com.coworkapp.loopplayer.ui.library.LibraryDestination
 import com.coworkapp.loopplayer.ui.library.LibraryScreen
 import com.coworkapp.loopplayer.ui.library.LibrarySort
+import com.coworkapp.loopplayer.ui.library.MiniPlayerBar
 import com.coworkapp.loopplayer.ui.theme.LoopPlayerTheme
 
 class MainActivity : ComponentActivity() {
@@ -78,42 +79,60 @@ class MainActivity : ComponentActivity() {
                                 }
                             })
                         } else {
-                            LibraryScreen(
-                                state = libState,
-                                onSearchClick = libraryViewModel::enterSearch,
-                                onSearchExit = libraryViewModel::exitSearch,
-                                onQueryChange = libraryViewModel::setQuery,
-                                onSortChange = libraryViewModel::setSort,
-                                onGroupChange = libraryViewModel::setGroup,
-                                onFilterToggle = libraryViewModel::toggleFilter,
-                                onViewOptionChange = libraryViewModel::setViewOptions,
-                                onChipSelect = libraryViewModel::selectChip,
-                                onResetSheet = libraryViewModel::resetSheet,
-                                onApplySheet = { /* 시트 적용은 즉시 반영되므로 닫기만 */ },
-                                onSongClick = { song ->
-                                    playerViewModel.openTrack(Uri.parse(song.id), song.title)
-                                    libraryRequested = false
-                                },
-                                onSongLongPress = { /* TODO: 다중 선택 */ },
-                                onToggleFavorite = { song ->
-                                    libraryViewModel.toggleFavorite(song.id)
-                                },
-                                onNavigate = { dest ->
-                                    when (dest) {
-                                        LibraryDestination.Library -> {
-                                            libraryViewModel.selectChip("모두")
-                                            libraryViewModel.setSort(LibrarySort.RecentlyAdded)
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                LibraryScreen(
+                                    state = libState,
+                                    onSearchClick = libraryViewModel::enterSearch,
+                                    onSearchExit = libraryViewModel::exitSearch,
+                                    onQueryChange = libraryViewModel::setQuery,
+                                    onSortChange = libraryViewModel::setSort,
+                                    onGroupChange = libraryViewModel::setGroup,
+                                    onFilterToggle = libraryViewModel::toggleFilter,
+                                    onViewOptionChange = libraryViewModel::setViewOptions,
+                                    onChipSelect = libraryViewModel::selectChip,
+                                    onResetSheet = libraryViewModel::resetSheet,
+                                    onApplySheet = { /* 시트 적용은 즉시 반영되므로 닫기만 */ },
+                                    onSongClick = { song ->
+                                        playerViewModel.openTrack(Uri.parse(song.id), song.title)
+                                        libraryRequested = false
+                                    },
+                                    onSongLongPress = { /* TODO: 다중 선택 */ },
+                                    onToggleFavorite = { song ->
+                                        libraryViewModel.toggleFavorite(song.id)
+                                    },
+                                    onNavigate = { dest ->
+                                        when (dest) {
+                                            LibraryDestination.Library -> {
+                                                libraryViewModel.selectChip("모두")
+                                                libraryViewModel.setSort(LibrarySort.RecentlyAdded)
+                                            }
+                                            LibraryDestination.Recordings -> libraryViewModel.selectChip("녹음")
+                                            LibraryDestination.Favorites  -> libraryViewModel.selectChip("★")
+                                            LibraryDestination.RecentPractice -> {
+                                                libraryViewModel.selectChip("모두")
+                                                libraryViewModel.setSort(LibrarySort.RecentPractice)
+                                            }
+                                            else -> { /* 나머지 destination 은 드로어에서 제거됨 */ }
                                         }
-                                        LibraryDestination.Recordings -> libraryViewModel.selectChip("녹음")
-                                        LibraryDestination.Favorites  -> libraryViewModel.selectChip("★")
-                                        LibraryDestination.RecentPractice -> {
-                                            libraryViewModel.selectChip("모두")
-                                            libraryViewModel.setSort(LibrarySort.RecentPractice)
-                                        }
-                                        else -> { /* 나머지 destination 은 드로어에서 제거됨 */ }
-                                    }
-                                },
-                            )
+                                    },
+                                )
+                                // 재생 중인 트랙이 있으면 하단에 미니 플레이어 바
+                                if (hasTrack) {
+                                    val progress = if (playerState.durationMs > 0)
+                                        playerState.positionMs.toFloat() / playerState.durationMs
+                                    else 0f
+                                    MiniPlayerBar(
+                                        title = playerState.trackTitle,
+                                        isPlaying = playerState.isPlaying,
+                                        progress = progress,
+                                        onClick = { libraryRequested = false },
+                                        onTogglePlay = playerViewModel::togglePlay,
+                                        modifier = Modifier
+                                            .align(Alignment.BottomCenter)
+                                            .navigationBarsPadding(),
+                                    )
+                                }
+                            }
                         }
                     } else {
                         // 플레이어 화면에서 시스템 뒤로가기 → 라이브러리로 복귀

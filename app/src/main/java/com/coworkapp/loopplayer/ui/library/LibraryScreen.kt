@@ -111,7 +111,11 @@ fun LibraryScreen(
                     onSelect = onChipSelect,
                 )
                 SortLine()
-                LazyColumn(Modifier.fillMaxSize()) {
+                // 하단 미니플레이어 바(약 64dp)에 마지막 항목이 가리지 않게 여백.
+                LazyColumn(
+                    Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 72.dp),
+                ) {
                     if (state.group == LibraryGroup.None) {
                         items(state.songs, key = { it.id }) { song ->
                             SongRow(

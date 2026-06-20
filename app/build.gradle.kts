@@ -61,6 +61,8 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:1.4.1")
     implementation("androidx.media3:media3-ui:1.4.1")
     implementation("androidx.media3:media3-common:1.4.1")
+    // MediaSession — 시스템 알림·잠금화면·이어폰 컨트롤 + 포그라운드 재생
+    implementation("androidx.media3:media3-session:1.4.1")
 
     // DataStore for saving sections
     implementation("androidx.datastore:datastore-preferences:1.1.1")
