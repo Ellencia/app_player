@@ -116,7 +116,7 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     fun resetSheet() {
         _uiState.update {
             it.copy(
-                sort = LibrarySort.RecentPractice,
+                sort = LibrarySort.RecentlyAdded,
                 sortDescending = true,
                 group = LibraryGroup.None,
                 filters = emptySet(),
@@ -215,6 +215,8 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     private fun applySort(songs: List<LibrarySong>): List<LibrarySong> {
         val state = _uiState.value
         val ordered = when (state.sort) {
+            // 연습한 곡은 최근 순으로 위에, 미연습 곡은 그 아래에서 최근추가순 유지
+            // (songs 가 이미 date_added DESC 이고 sortedByDescending 가 stable).
             LibrarySort.RecentPractice -> songs.sortedByDescending { it.lastPracticed ?: 0L }
             LibrarySort.RecentlyAdded  -> songs // raw tracks 가 이미 date_added DESC 정렬
             LibrarySort.Title          -> songs.sortedBy { it.title }

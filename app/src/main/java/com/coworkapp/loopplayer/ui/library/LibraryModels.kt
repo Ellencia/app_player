@@ -85,7 +85,9 @@ data class LibraryUiState(
     val activeCount:    Int               = 0,
     val recordingCount: Int               = 0,
     val favoriteCount:  Int               = 0,
-    val sort:           LibrarySort       = LibrarySort.RecentPractice,
+    // 기본 = 최근 추가순. 방금 넣은 곡이 맨 위에 보이도록.
+    // (연습 순은 시트에서 선택)
+    val sort:           LibrarySort       = LibrarySort.RecentlyAdded,
     val sortDescending: Boolean           = true,
     val group:          LibraryGroup      = LibraryGroup.None,
     val filters:        Set<LibraryQuickFilter> = emptySet(),

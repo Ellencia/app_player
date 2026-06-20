@@ -76,8 +76,12 @@ class LibraryRepository(private val context: Context) {
         }
         val projection = baseProjection.toTypedArray()
 
-        val selection = "${MediaStore.Audio.Media.DURATION} >= ?"
-        val args = arrayOf("1500")
+        // 길이 필터는 selection 으로 걸지 않는다 — 일부 파일은 MediaStore 가 DURATION 을
+        // 0/null 로 인덱싱하는데 "DURATION >= 1500" selection 은 그런 곡까지 제외해버려
+        // (다른 앱엔 보이는데 우리 앱엔 안 나옴) 문제가 됐음.
+        // 대신 아래 루프에서 "확실히 1.5초 미만인 것"만 거른다 (0/불명은 통과).
+        val selection: String? = null
+        val args: Array<String>? = null
         val sortOrder = "${MediaStore.Audio.Media.DATE_ADDED} DESC"
 
         val out = ArrayList<MusicTrack>()
@@ -105,6 +109,11 @@ class LibraryRepository(private val context: Context) {
                 // 알림/알람/벨소리는 라이브러리에서 완전 제외
                 if (isNotif || isAlarm || isRing) continue
 
+                // 확실히 1.5초 미만인 것만 제외 (시스템 효과음). DURATION 이 0/불명인
+                // 곡은 길이 모를 뿐 정상 음원일 수 있으니 통과시킨다.
+                val durRaw = c.getLong(durCol)
+                if (durRaw in 1 until 1500) continue
+
                 val id = c.getLong(idCol)
                 val displayName = c.getString(nameCol) ?: ""
                 val title = c.getString(titleCol)?.takeIf { it.isNotBlank() }
@@ -112,7 +121,7 @@ class LibraryRepository(private val context: Context) {
                 val rawArtist = c.getString(artistCol)
                 val artist = if (rawArtist.isNullOrBlank() || rawArtist == "<unknown>")
                     "알 수 없는 아티스트" else rawArtist
-                val duration = c.getLong(durCol)
+                val duration = durRaw
                 val date = c.getLong(dateCol)
                 val relPath = if (pathCol >= 0) c.getString(pathCol) ?: "" else ""
                 val isRecordingFlag =
